@@ -4,9 +4,11 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
 import App from './App.jsx'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_CLIENT_ID}>
     <App />
     <ToastContainer
       position="top-right"
@@ -20,5 +22,6 @@ createRoot(document.getElementById('root')).render(
       pauseOnHover
       theme="light"
     />
+    </GoogleOAuthProvider>
   </StrictMode>,
 )

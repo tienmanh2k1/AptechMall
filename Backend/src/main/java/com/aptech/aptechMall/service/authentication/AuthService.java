@@ -242,9 +242,9 @@ public class AuthService {
 
             User newUser = new User();
             newUser.setEmail(request.getEmail());
-            newUser.setFullName(request.getFullname());
+            newUser.setFullName(request.getFullName());
             newUser.setUsername(request.getUsername()); //Let frontend set username during registration before request hit backend
-            newUser.setPassword(passwordEncoder.encode("")); //Should let Frontend handle setting password during registration
+            newUser.setPassword(passwordEncoder.encode("")); // No blank login from authenticate() should be possible
             newUser.setEmailVerified(true);
             newUser.setOAuth(oAuthGoogle);
             return userRepository.save(newUser);

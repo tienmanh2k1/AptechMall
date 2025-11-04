@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { logout as logoutApi } from '../services'
 
 const AuthContext = createContext(null);
 
@@ -100,8 +101,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    logoutApi();
     setToken(null);
     setUser(null);
   };

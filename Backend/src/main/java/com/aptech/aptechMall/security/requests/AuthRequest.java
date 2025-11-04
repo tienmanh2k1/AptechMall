@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 public class AuthRequest { //DTO is shared by both authenticate() and authenticateGoogle(), do not insert @NotBlank in any fields
     private String username;
     private String password;
-    private String fullname;
+    private String fullName;
     private String email;
     private String googleSub;
 }

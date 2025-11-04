@@ -27,6 +27,35 @@ export const login = async (credentials) => {
   }
 };
 
+
+/**
+ * Login user
+ * @param {Object} authRequest
+ * @param {string} authRequest.email - Google email
+ * @param {string} authRequest.name - Google Full Name
+ * @param {string} authRequest.sub - Google Id
+ * @param {string} username - Either from form's username or Username from Email
+ * @returns {Promise<Object>} Response with token
+ */
+export const googleOauth = async (authRequest, username) => {
+  try {
+    console.log("Email in googleOauth: " + authRequest.email);
+    const response = await api.post('/auth/login?method=google', {
+      email: authRequest.email,
+      fullName: authRequest.fullName,
+      googleSub: authRequest.googleSub,
+      username: username
+    });
+
+    // Backend returns: { token: "eyJhbGci..." }
+    return response.data;
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
+};
+
+
 /**
  * Register new user
  * @param {Object} userData
@@ -43,8 +72,7 @@ export const register = async (userData) => {
       username: userData.username,     // REQUIRED
       password: userData.password,     // REQUIRED
       fullName: userData.fullName,     // REQUIRED (not "name")
-      email: userData.email,           // REQUIRED
-      role: userData.role || 'CUSTOMER' // OPTIONAL (default: CUSTOMER)
+      email: userData.email            // REQUIRED
     });
 
     // Backend returns: { message: "Successfully registered the user {username}" }
@@ -96,7 +124,7 @@ export const getCurrentUser = async () => {
  */
 export const refreshToken = async () => {
   try {
-    // No need to send refresh_token in body - it's in httpOnly cookie
+    // Changed backend to only use Redis for Refresh Token management
     const response = await api.post('/auth/refresh');
     return response.data;
   } catch (error) {

@@ -22,6 +22,7 @@ public class UsersDataController {
 
     private final UserManagementService service;
 
+    @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
     @GetMapping("/")
     public ResponseEntity<Page<UserResponseDTO>> getAllUsers(@RequestParam(name = "page", defaultValue = "0") int page,
                                                              @RequestParam(name = "size", defaultValue = "10") int size) {
@@ -30,6 +31,7 @@ public class UsersDataController {
         return ResponseEntity.ok(users);
     }
 
+    @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
     @GetMapping("/{id}")
     public ResponseEntity<UserResponseDTO> getUserById(@PathVariable Long id) {
         return service.getUserById(id)
@@ -37,6 +39,7 @@ public class UsersDataController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> updateUser(@PathVariable Long id, @RequestBody UserUpdateDTO dto) {
         try {

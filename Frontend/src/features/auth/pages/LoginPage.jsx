@@ -5,7 +5,8 @@ import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../../cart/context/CartContext';
-import { login as loginApi } from '../services';
+import { login as loginApi, googleOauth } from '../services';
+import { GoogleLogin } from '@react-oauth/google';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -65,6 +66,53 @@ const LoginPage = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const handleGoogleLogin = async (e) => {
+
+    try {
+      setLoading(true);
+    const jwtToken = e.credential;
+    const base64Payload = jwtToken.split('.')[1];
+    const payload = JSON.parse(atob(base64Payload));
+
+
+    const authRequest = {
+      email: payload.email,
+      fullName: payload.name,
+      googleSub: payload.sub
+    };
+    
+    console.log("Email from oAuth: ", JSON.stringify(payload, null, 2))
+    console.log("Sub: " + authRequest.googleSub + " " + payload.sub);
+    const username = formData.username.length === 0 ? authRequest.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_") : formData.username;
+    const response = await googleOauth(authRequest, username);
+
+    if (response.status === 200){
+      const token = response.token;
+      if (!token) {
+        throw new Error('No token received from server');
+      }
+      const user = {
+        username: username,
+      };
+
+      login(token, user);
+
+      console.log('🛒 [LoginPage] Refreshing cart after successful login');
+      refreshCart();
+
+      toast.success('Login successful!');
+      navigate("/");
+    }
+
+    } catch (error){
+      setLoading(false);
+      console.error('Login error:', error);
+      if (error.response.status === 409){
+        setErrors("Username from email might have been registered by other users, try filling an alternative username in the form as your secondary");
+      }
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -268,6 +316,11 @@ const LoginPage = () => {
               )}
             </button>
           </form>
+          <br/>
+          <GoogleLogin 
+            onSuccess={handleGoogleLogin}
+            onError={() => console.log('Login Failed')}
+          />   
 
           {/* Footer */}
           <div className="mt-6">
