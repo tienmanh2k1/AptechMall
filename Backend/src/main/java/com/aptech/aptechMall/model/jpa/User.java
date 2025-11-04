@@ -1,0 +1,109 @@
+package com.aptech.aptechMall.model.jpa;
+import com.aptech.aptechMall.security.Role;
+import com.aptech.aptechMall.security.Status;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Getter
+public class User implements UserDetails {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(unique = true, length = 30)
+    private String username;
+
+    @Column(name = "password_hash", nullable = false, length = 255)
+    private String password;
+
+    @Column(name = "email", length = 30, unique = true, nullable = false)
+    private String email;
+
+    @Column(name="full_name", length=191, nullable = false)
+    private String fullName;
+
+    @Column(name = "avatar_url", length = 512)
+    private String avatarUrl;
+
+    @Column(name = "email_verified", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean emailVerified;
+
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(nullable = false, columnDefinition = "ENUM('ADMIN', 'STAFF', 'CUSTOMER') DEFAULT 'CUSTOMER'")
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    @Column(nullable = false, columnDefinition = "ENUM('ACTIVE', 'SUSPENDED', 'DELETED') DEFAULT 'ACTIVE'")
+    @Enumerated(EnumType.STRING)
+    private Status status;
+
+    @Column(name = "registered_at", nullable = false, updatable = false)
+    @CreationTimestamp
+    private LocalDateTime registeredAt;
+
+    @Column(name = "updated_at", nullable = false)
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
+    @Column(name="last_login")
+    private LocalDateTime lastLogin;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserAddresses> userAddresses = new HashSet<>();
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return !(status == Status.DELETED);
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return !(status == Status.SUSPENDED);
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return status == Status.ACTIVE;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.status == null) {
+            this.status = Status.ACTIVE;
+        }
+        if (this.role == null) {
+            this.role = Role.CUSTOMER;
+        }
+    }
+}

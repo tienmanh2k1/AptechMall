@@ -1,0 +1,54 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Claude Code ###
+.claude/
+
+### Compiled files ###
+*.class
+
+### Test files in root ###
+test_*.java
+verify_*.java
+
+### Documentation (keep only README.md) ###
+*_API_*.md
+*_IMPLEMENTATION*.md
+*_FIXES*.md
+QUICK_START*.md
+CLAUDE.md
+
+### System files ###
+C:WindowsSystem32*
+hosts

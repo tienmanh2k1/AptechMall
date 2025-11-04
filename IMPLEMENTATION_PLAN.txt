@@ -1,0 +1,1052 @@
+================================================================================
+  APTECHMALL - KẾ HOẠCH TRIỂN KHAI ADMIN DASHBOARD & ORDER MANAGEMENT
+================================================================================
+
+Ngày tạo: 2025-11-03
+Mục tiêu: Xây dựng hệ thống quản trị admin để quản lý đơn hàng và người dùng
+
+================================================================================
+TỔNG QUAN CÁC PHASE
+================================================================================
+
+PHASE 1: ADMIN ORDER MANAGEMENT (1-2 tuần) - ƯU TIÊN CAO NHẤT ⭐⭐⭐
+  └─ Mục tiêu: Admin có thể xem và xử lý đơn hàng
+
+PHASE 2: USER MANAGEMENT UI (1 tuần) - ƯU TIÊN CAO ⭐⭐
+  └─ Mục tiêu: Admin quản lý người dùng qua giao diện
+
+PHASE 3: DASHBOARD ANALYTICS (1 tuần) - ƯU TIÊN TRUNG BÌNH ⭐
+  └─ Mục tiêu: Thống kê và báo cáo tổng quan
+
+
+================================================================================
+PHASE 1: ADMIN ORDER MANAGEMENT - CHI TIẾT TASKS
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ A. BACKEND - ADMIN ORDER APIs                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 1.1: Tạo AdminOrderController
+    File: Backend/src/main/java/com/aptech/aptechMall/controller/AdminOrderController.java
+
+    Endpoints cần tạo:
+    - GET    /api/admin/orders                    - Lấy tất cả đơn hàng (all users)
+    - GET    /api/admin/orders/{id}               - Xem chi tiết đơn hàng
+    - PUT    /api/admin/orders/{id}/status        - Cập nhật status
+    - POST   /api/admin/orders/{id}/notes         - Thêm ghi chú nội bộ
+    - GET    /api/admin/orders/{id}/history       - Xem lịch sử thay đổi
+    - DELETE /api/admin/orders/{id}               - Hủy đơn hàng
+
+    Authorization: @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+
+    Query parameters cho GET /api/admin/orders:
+    - status: String (PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED)
+    - userId: Long (filter theo khách hàng)
+    - startDate: LocalDateTime
+    - endDate: LocalDateTime
+    - search: String (tìm theo order number, customer name)
+    - page: int (default 0)
+    - size: int (default 20)
+    - sort: String (default "createdAt,desc")
+
+
+[ ] Task 1.2: Tạo Entity OrderHistory (Audit Log)
+    File: Backend/src/main/java/com/aptech/aptechMall/entity/OrderHistory.java
+
+    Fields:
+    - Long id (PK, auto-increment)
+    - Long orderId (FK to Order)
+    - Long performedBy (userId của người thực hiện thay đổi)
+    - String action (enum: STATUS_CHANGED, NOTE_ADDED, CANCELLED, CREATED)
+    - String oldValue (giá trị cũ, nullable)
+    - String newValue (giá trị mới)
+    - String note (ghi chú, nullable)
+    - LocalDateTime timestamp (thời điểm thay đổi)
+
+    Relationships:
+    - @ManyToOne Order
+    - @ManyToOne User (performedBy)
+
+    Indexes:
+    - orderId
+    - performedBy
+    - timestamp
+
+
+[ ] Task 1.3: Tạo OrderHistoryRepository
+    File: Backend/src/main/java/com/aptech/aptechMall/repository/OrderHistoryRepository.java
+
+    Methods:
+    - List<OrderHistory> findByOrderIdOrderByTimestampDesc(Long orderId)
+    - List<OrderHistory> findByPerformedBy(Long userId)
+
+
+[ ] Task 1.4: Cập nhật OrderService - thêm admin methods
+    File: Backend/src/main/java/com/aptech/aptechMall/service/OrderService.java
+
+    Methods cần thêm:
+    - Page<OrderResponse> getAllOrders(filters, pageable) - Lấy tất cả đơn
+    - OrderResponse updateOrderStatus(orderId, newStatus, adminUserId) - Cập nhật status
+    - OrderResponse addOrderNote(orderId, note, adminUserId) - Thêm ghi chú
+    - List<OrderHistoryResponse> getOrderHistory(orderId) - Xem lịch sử
+    - void logOrderHistory(orderId, action, oldValue, newValue, userId, note) - Log thay đổi
+
+    Business Logic:
+    - Khi update status: tự động log vào OrderHistory
+    - Validate status transitions (PENDING→CONFIRMED→SHIPPING→DELIVERED)
+    - Chỉ cho phép cancel đơn PENDING hoặc CONFIRMED
+    - Gửi notification khi status thay đổi (phase 2)
+
+
+[ ] Task 1.5: Tạo DTO cho Admin Order
+    File: Backend/src/main/java/com/aptech/aptechMall/dto/
+
+    DTOs cần tạo:
+
+    1. AdminOrderListResponse.java (cho danh sách)
+       - Long id
+       - String orderNumber
+       - OrderStatus status
+       - BigDecimal totalAmount
+       - Long userId
+       - String customerName
+       - String customerEmail
+       - String shippingAddress
+       - String phone
+       - LocalDateTime createdAt
+       - LocalDateTime updatedAt
+       - int itemCount
+
+    2. AdminOrderDetailResponse.java (chi tiết đầy đủ)
+       - Extends OrderResponse
+       - List<OrderHistoryResponse> history
+       - String internalNotes
+       - String customerEmail
+       - String customerPhone
+
+    3. OrderHistoryResponse.java
+       - Long id
+       - String action
+       - String oldValue
+       - String newValue
+       - String note
+       - String performedByName
+       - Long performedById
+       - LocalDateTime timestamp
+
+    4. UpdateOrderStatusRequest.java
+       - String status (PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED)
+       - String note (optional)
+
+    5. AddOrderNoteRequest.java
+       - String note
+
+
+[ ] Task 1.6: Update SecurityConfig
+    File: Backend/src/main/java/com/aptech/aptechMall/config/SecurityConfig.java
+
+    Thêm vào security filter chain:
+    .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF")
+
+
+[ ] Task 1.7: Tạo AdminOrderService (optional - tách biệt logic)
+    File: Backend/src/main/java/com/aptech/aptechMall/service/AdminOrderService.java
+
+    Lý do tách riêng:
+    - Tách biệt logic admin và customer
+    - Dễ maintain và test
+    - Có thể thêm business logic phức tạp sau
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ B. FRONTEND - ADMIN LAYOUT & NAVIGATION                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 2.1: Tạo AdminRoute component (Authorization)
+    File: Frontend/src/components/AdminRoute.jsx
+
+    Logic:
+    - Check user role từ AuthContext
+    - Chỉ cho phép ADMIN và STAFF
+    - Redirect về /login nếu chưa login
+    - Redirect về /unauthorized nếu không phải admin
+
+    Example:
+    ```jsx
+    const AdminRoute = ({ children }) => {
+      const { user, isAuthenticated } = useAuth();
+
+      if (!isAuthenticated()) return <Navigate to="/login" />;
+
+      if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+        return <Navigate to="/unauthorized" />;
+      }
+
+      return children;
+    };
+    ```
+
+
+[ ] Task 2.2: Tạo Admin Layout Component
+    File: Frontend/src/features/admin/components/AdminLayout.jsx
+
+    Structure:
+    - Sidebar navigation (fixed left)
+    - Top header (breadcrumb, user info, notifications)
+    - Main content area
+    - Footer
+
+    Sidebar menu items:
+    - Dashboard (icon: LayoutDashboard)
+    - Orders (icon: Package) - active state
+    - Users (icon: Users)
+    - Exchange Rates (icon: DollarSign)
+    - Settings (icon: Settings)
+    - Logout (icon: LogOut)
+
+    Responsive:
+    - Desktop: sidebar luôn hiển thị
+    - Mobile: hamburger menu, sidebar collapse
+
+
+[ ] Task 2.3: Tạo Admin Sidebar Component
+    File: Frontend/src/features/admin/components/Sidebar.jsx
+
+    Features:
+    - Active menu item highlight
+    - Icon + label cho mỗi menu
+    - Collapsible trên mobile
+    - Badge hiển thị số đơn hàng pending
+
+
+[ ] Task 2.4: Tạo Admin Header Component
+    File: Frontend/src/features/admin/components/AdminHeader.jsx
+
+    Features:
+    - Breadcrumb navigation
+    - User dropdown menu
+    - Notification bell icon (số đơn mới)
+    - Quick search (optional)
+
+
+[ ] Task 2.5: Tạo Unauthorized Page
+    File: Frontend/src/pages/Unauthorized.jsx
+
+    Content:
+    - Icon cảnh báo
+    - Message: "Bạn không có quyền truy cập trang này"
+    - Button về trang chủ
+
+
+[ ] Task 2.6: Update App Routes
+    File: Frontend/src/App.jsx
+
+    Thêm admin routes:
+    ```jsx
+    <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+      <Route index element={<Navigate to="/admin/dashboard" />} />
+      <Route path="dashboard" element={<Dashboard />} />
+      <Route path="orders" element={<AdminOrderList />} />
+      <Route path="orders/:id" element={<AdminOrderDetail />} />
+      <Route path="users" element={<UserManagement />} />
+      <Route path="exchange-rates" element={<ExchangeRateManagement />} />
+    </Route>
+    <Route path="/unauthorized" element={<Unauthorized />} />
+    ```
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ C. FRONTEND - ORDER MANAGEMENT PAGES                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 3.1: Tạo Admin Order API Service
+    File: Frontend/src/features/admin/services/adminOrderApi.js
+
+    Functions:
+    - getAllOrders(filters, page, size, sort) - GET /api/admin/orders
+    - getOrderById(id) - GET /api/admin/orders/{id}
+    - updateOrderStatus(id, status, note) - PUT /api/admin/orders/{id}/status
+    - addOrderNote(id, note) - POST /api/admin/orders/{id}/notes
+    - getOrderHistory(id) - GET /api/admin/orders/{id}/history
+    - cancelOrder(id, reason) - DELETE /api/admin/orders/{id}
+
+    All functions sử dụng axios instance với JWT token
+
+
+[ ] Task 3.2: Tạo Order List Page
+    File: Frontend/src/features/admin/pages/OrderList.jsx
+
+    Features:
+    - Table hiển thị orders với columns:
+      * Order Number (link to detail)
+      * Customer Name
+      * Total Amount (formatted)
+      * Status (badge với màu)
+      * Items Count
+      * Created Date
+      * Actions (View, Quick Update Status)
+
+    - Filter Section:
+      * Status tabs (All, Pending, Confirmed, Shipping, Delivered, Cancelled)
+      * Date range picker (From - To)
+      * Customer search (name, email)
+      * Order number search
+      * Clear filters button
+
+    - Sorting:
+      * Click column header to sort
+      * Default: newest first (createdAt desc)
+
+    - Pagination:
+      * Page numbers
+      * Items per page selector (10, 20, 50, 100)
+      * Total count display
+
+    - Quick Actions:
+      * Dropdown menu for each row
+      * "View Detail" button
+      * "Confirm Order" (if PENDING)
+      * "Mark as Shipping" (if CONFIRMED)
+      * "Mark as Delivered" (if SHIPPING)
+      * "Cancel Order" (if PENDING or CONFIRMED)
+
+    - Bulk Actions (optional):
+      * Select multiple orders
+      * Bulk status update
+
+
+[ ] Task 3.3: Tạo Status Badge Component
+    File: Frontend/src/features/admin/components/StatusBadge.jsx
+
+    Props: status (OrderStatus enum)
+
+    Colors:
+    - PENDING: yellow/orange (bg-yellow-100 text-yellow-800)
+    - CONFIRMED: blue (bg-blue-100 text-blue-800)
+    - SHIPPING: purple (bg-purple-100 text-purple-800)
+    - DELIVERED: green (bg-green-100 text-green-800)
+    - CANCELLED: red (bg-red-100 text-red-800)
+
+    Icons:
+    - PENDING: Clock
+    - CONFIRMED: CheckCircle
+    - SHIPPING: Truck
+    - DELIVERED: Package
+    - CANCELLED: XCircle
+
+
+[ ] Task 3.4: Tạo Order Detail Page
+    File: Frontend/src/features/admin/pages/OrderDetail.jsx
+
+    Layout: 3 columns responsive grid
+
+    LEFT COLUMN (Order Info):
+    - Order Header:
+      * Order number (large, prominent)
+      * Status badge (large)
+      * Created date
+      * Last updated
+
+    - Customer Info Card:
+      * Customer name (link to user profile)
+      * Email (clickable mailto:)
+      * Phone (clickable tel:)
+      * Registered date
+      * Total orders count
+
+    - Shipping Info Card:
+      * Full shipping address
+      * Phone number
+      * Order notes (if any)
+
+    MIDDLE COLUMN (Order Items):
+    - Order Items Table:
+      * Product image thumbnail
+      * Product name
+      * Marketplace badge
+      * Variant info
+      * Quantity
+      * Unit price
+      * Subtotal
+
+    - Order Summary:
+      * Subtotal
+      * Shipping fee (if any)
+      * Discount (if any)
+      * Grand Total (large, bold)
+
+    RIGHT COLUMN (Actions & History):
+    - Status Update Section:
+      * Current status (prominent)
+      * Next action buttons:
+        - "Confirm Order" (PENDING → CONFIRMED)
+        - "Mark as Shipping" (CONFIRMED → SHIPPING)
+        - "Mark as Delivered" (SHIPPING → DELIVERED)
+        - "Cancel Order" (with reason input)
+      * Add note textarea + "Add Note" button
+
+    - Order Timeline/History:
+      * Vertical timeline component
+      * Each event shows:
+        - Action icon
+        - Action description
+        - Performed by (admin name)
+        - Timestamp
+        - Note (if any)
+      * Color-coded by action type
+      * Most recent at top
+
+
+[ ] Task 3.5: Tạo Order Timeline Component
+    File: Frontend/src/features/admin/components/OrderTimeline.jsx
+
+    Props: history (array of OrderHistoryResponse)
+
+    Display:
+    - Vertical timeline with dots and connecting lines
+    - Each item shows:
+      * Colored dot (based on action)
+      * Action title (STATUS_CHANGED, NOTE_ADDED, etc.)
+      * Old value → New value (for status changes)
+      * Performed by name
+      * Timestamp (relative: "2 hours ago")
+      * Note content (if exists)
+
+    Icons for actions:
+    - STATUS_CHANGED: ArrowRight
+    - NOTE_ADDED: MessageSquare
+    - CANCELLED: XCircle
+    - CREATED: Plus
+
+
+[ ] Task 3.6: Tạo Update Status Modal/Dialog
+    File: Frontend/src/features/admin/components/UpdateStatusModal.jsx
+
+    Props:
+    - isOpen (boolean)
+    - onClose (function)
+    - currentStatus (OrderStatus)
+    - orderId (Long)
+    - onSuccess (callback after update)
+
+    Content:
+    - Status dropdown (only show valid next statuses)
+    - Optional note textarea
+    - Confirm button
+    - Cancel button
+
+    Validation:
+    - PENDING → CONFIRMED, CANCELLED only
+    - CONFIRMED → SHIPPING, CANCELLED only
+    - SHIPPING → DELIVERED only
+    - DELIVERED → no changes
+    - CANCELLED → no changes
+
+
+[ ] Task 3.7: Tạo Cancel Order Modal
+    File: Frontend/src/features/admin/components/CancelOrderModal.jsx
+
+    Props:
+    - isOpen, onClose, orderId, onSuccess
+
+    Content:
+    - Warning message
+    - Reason dropdown:
+      * Customer requested
+      * Out of stock
+      * Payment failed
+      * Fraudulent order
+      * Other (with text input)
+    - Confirm cancellation button (red, dangerous)
+    - Cancel button
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ D. STYLING & UI COMPONENTS                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 4.1: Tạo Table Component (reusable)
+    File: Frontend/src/components/Table.jsx
+
+    Features:
+    - Responsive table
+    - Sortable columns
+    - Row hover effect
+    - Empty state
+    - Loading state
+
+
+[ ] Task 4.2: Tạo DateRangePicker Component
+    File: Frontend/src/components/DateRangePicker.jsx
+
+    Library: react-datepicker hoặc custom với input[type="date"]
+
+    Features:
+    - Start date input
+    - End date input
+    - Quick presets (Today, Last 7 days, Last 30 days, This month)
+    - Clear button
+
+
+[ ] Task 4.3: Tạo Pagination Component (reusable)
+    File: Frontend/src/components/Pagination.jsx
+
+    Props:
+    - currentPage
+    - totalPages
+    - onPageChange
+    - itemsPerPage
+    - onItemsPerPageChange
+
+    Features:
+    - Previous/Next buttons
+    - Page numbers (with ellipsis for many pages)
+    - Items per page selector
+    - Total items display
+
+
+[ ] Task 4.4: Tạo Modal Component (reusable)
+    File: Frontend/src/components/Modal.jsx
+
+    Features:
+    - Backdrop overlay
+    - Close button (X)
+    - Click outside to close
+    - ESC key to close
+    - Slide-in animation
+    - Customizable size (sm, md, lg, xl)
+
+
+[ ] Task 4.5: Update Tailwind Config (if needed)
+    File: Frontend/tailwind.config.js
+
+    Thêm custom colors cho admin:
+    - admin-primary: '#1e3a8a' (blue-900)
+    - admin-secondary: '#3b82f6' (blue-500)
+    - admin-accent: '#10b981' (green-500)
+
+    Thêm custom spacing, shadows cho admin UI
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ E. TESTING                                                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 5.1: Backend Unit Tests
+    File: Backend/src/test/java/com/aptech/aptechMall/service/
+
+    Tests cho AdminOrderService:
+    - testGetAllOrders_Success()
+    - testGetAllOrders_WithFilters()
+    - testUpdateOrderStatus_PendingToConfirmed_Success()
+    - testUpdateOrderStatus_InvalidTransition_ThrowsException()
+    - testCancelOrder_PendingOrder_Success()
+    - testCancelOrder_DeliveredOrder_ThrowsException()
+    - testAddOrderNote_Success()
+    - testGetOrderHistory_ReturnsChronologicalOrder()
+    - testLogOrderHistory_CreatesRecord()
+
+    Tests cho AdminOrderController:
+    - testGetAllOrders_Unauthorized_Returns401()
+    - testGetAllOrders_AsAdmin_Returns200()
+    - testUpdateStatus_AsStaff_Returns200()
+
+
+[ ] Task 5.2: Backend Integration Tests
+    File: Backend/src/test/java/com/aptech/aptechMall/integration/
+
+    Tests:
+    - testOrderWorkflow_PendingToDelivered()
+    - testOrderCancellation_WithHistory()
+    - testAdminAccessControl_NonAdminDenied()
+
+
+[ ] Task 5.3: Frontend Component Tests (optional)
+    Tools: Vitest + React Testing Library
+
+    Tests:
+    - AdminRoute authorization logic
+    - StatusBadge renders correct color
+    - OrderTimeline displays events correctly
+    - UpdateStatusModal validation
+
+
+[ ] Task 5.4: End-to-End Testing (optional)
+    Tool: Playwright hoặc Cypress
+
+    Scenarios:
+    - Admin login → View orders → Update status → Verify history
+    - Customer places order → Admin confirms → Customer sees updated status
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ F. DOCUMENTATION                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 6.1: Update Backend CLAUDE.md
+    File: Backend/CLAUDE.md
+
+    Thêm sections:
+    - Admin Order Management APIs
+    - OrderHistory entity documentation
+    - Admin authorization notes
+
+
+[ ] Task 6.2: Update Frontend CLAUDE.md
+    File: Frontend/CLAUDE.md
+
+    Thêm sections:
+    - Admin routes structure
+    - AdminRoute authorization
+    - Admin layout components
+    - Order management pages
+
+
+[ ] Task 6.3: Tạo API Documentation (optional)
+    Tool: Swagger/OpenAPI
+
+    Document:
+    - All admin endpoints
+    - Request/response DTOs
+    - Authorization requirements
+
+
+[ ] Task 6.4: Tạo User Manual cho Admin
+    File: ADMIN_USER_GUIDE.md
+
+    Content:
+    - How to login as admin
+    - How to manage orders (confirm, ship, deliver, cancel)
+    - How to add notes to orders
+    - How to search and filter orders
+    - FAQ
+
+
+================================================================================
+PHASE 2: USER MANAGEMENT UI - CHI TIẾT TASKS
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ A. BACKEND - USER MANAGEMENT APIs (ĐÃ CÓ SẴN)                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[✓] GET    /api/users/              - Đã có
+[✓] GET    /api/users/{id}          - Đã có
+[✓] PUT    /api/users/{id}          - Đã có
+[✓] PATCH  /api/users/{id}          - Đã có
+[✓] DELETE /api/users/{id}          - Đã có
+
+[ ] Task 7.1: Thêm User Activity Logs (optional)
+    - Log user login/logout
+    - Log admin actions on users
+    - GET /api/admin/users/{id}/activity
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ B. FRONTEND - USER MANAGEMENT PAGES                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 7.2: Tạo User List Page
+    File: Frontend/src/features/admin/pages/UserList.jsx
+
+    Features:
+    - Table hiển thị users:
+      * Avatar
+      * Username
+      * Email
+      * Full Name
+      * Role (badge)
+      * Status (badge)
+      * Registered Date
+      * Last Login
+      * Actions (Edit, Suspend, Delete)
+
+    - Filters:
+      * Role filter (All, Admin, Staff, Customer)
+      * Status filter (All, Active, Suspended, Deleted)
+      * Search (username, email, name)
+
+    - Pagination
+
+    - Bulk Actions:
+      * Suspend multiple users
+      * Delete multiple users
+
+
+[ ] Task 7.3: Tạo User Detail/Edit Page
+    File: Frontend/src/features/admin/pages/UserDetail.jsx
+
+    Sections:
+    - User Info Card:
+      * Avatar (with upload)
+      * Username (editable)
+      * Email (editable)
+      * Full Name (editable)
+      * Phone (editable)
+      * Role selector
+      * Status selector
+      * Save button
+
+    - User Activity:
+      * Registration date
+      * Last login
+      * Total orders
+      * Total spent
+
+    - User Orders:
+      * Table showing user's orders
+      * Link to order detail
+
+    - Danger Zone:
+      * Suspend user button
+      * Delete user button (with confirmation)
+
+
+[ ] Task 7.4: Tạo Create User Modal
+    File: Frontend/src/features/admin/components/CreateUserModal.jsx
+
+    Form fields:
+    - Username
+    - Email
+    - Password
+    - Full Name
+    - Role (Admin, Staff, Customer)
+    - Phone (optional)
+
+    Validation:
+    - All required fields
+    - Email format
+    - Password strength
+    - Unique username/email
+
+
+[ ] Task 7.5: Tạo User API Service
+    File: Frontend/src/features/admin/services/userApi.js
+
+    Functions:
+    - getAllUsers(filters, page, size)
+    - getUserById(id)
+    - createUser(userData)
+    - updateUser(id, userData)
+    - deleteUser(id)
+    - suspendUser(id)
+    - activateUser(id)
+
+
+================================================================================
+PHASE 3: DASHBOARD ANALYTICS - CHI TIẾT TASKS
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ A. BACKEND - STATISTICS APIs                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 8.1: Tạo AdminStatsController
+    File: Backend/src/main/java/com/aptech/aptechMall/controller/AdminStatsController.java
+
+    Endpoints:
+    - GET /api/admin/stats/overview
+      Response: {
+        totalOrders: int,
+        pendingOrders: int,
+        totalRevenue: BigDecimal,
+        totalCustomers: int,
+        todayOrders: int,
+        todayRevenue: BigDecimal
+      }
+
+    - GET /api/admin/stats/revenue?period=day|week|month|year&startDate&endDate
+      Response: {
+        labels: ["2025-01-01", "2025-01-02", ...],
+        values: [1000000, 1500000, ...]
+      }
+
+    - GET /api/admin/stats/orders-by-status
+      Response: {
+        PENDING: 10,
+        CONFIRMED: 5,
+        SHIPPING: 8,
+        DELIVERED: 50,
+        CANCELLED: 2
+      }
+
+    - GET /api/admin/stats/top-products?limit=10
+      Response: [
+        { productId, title, marketplace, totalSold, revenue }
+      ]
+
+
+[ ] Task 8.2: Tạo AdminStatsService
+    File: Backend/src/main/java/com/aptech/aptechMall/service/AdminStatsService.java
+
+    Methods:
+    - getOverviewStats()
+    - getRevenueByPeriod(period, startDate, endDate)
+    - getOrdersByStatus()
+    - getTopProducts(limit)
+
+    Sử dụng:
+    - JPA aggregation queries
+    - @Query annotations
+    - GROUP BY, SUM, COUNT
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ B. FRONTEND - DASHBOARD PAGE                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+[ ] Task 8.3: Tạo Dashboard Page
+    File: Frontend/src/features/admin/pages/Dashboard.jsx
+
+    Layout: 4x3 grid (responsive)
+
+    TOP ROW - Stats Cards (4 cards):
+    1. Total Orders
+       - Icon: Package
+       - Number: 1,234
+       - Trend: +12% from last month
+
+    2. Pending Orders (cần xử lý)
+       - Icon: Clock
+       - Number: 23
+       - Urgent indicator (red if > 10)
+
+    3. Revenue (Today/This Month)
+       - Icon: DollarSign
+       - Number: 45,000,000 VND
+       - Trend: +8%
+
+    4. Total Customers
+       - Icon: Users
+       - Number: 567
+       - Trend: +5%
+
+    MIDDLE ROW - Charts (2 cards):
+    1. Revenue Chart (Left, 2/3 width)
+       - Line chart hoặc bar chart
+       - X-axis: dates
+       - Y-axis: revenue
+       - Period selector: Day, Week, Month, Year
+       - Library: recharts hoặc chart.js
+
+    2. Orders by Status (Right, 1/3 width)
+       - Donut chart hoặc pie chart
+       - Color-coded by status
+       - Show count for each status
+
+    BOTTOM ROW - Tables (2 cards):
+    1. Recent Orders (Left, 1/2 width)
+       - Table with latest 5-10 orders
+       - Columns: Order #, Customer, Total, Status, Date
+       - "View All Orders" link
+
+    2. Top Products (Right, 1/2 width)
+       - Table with best-selling products
+       - Columns: Product, Marketplace, Sold, Revenue
+       - "View All Products" link
+
+
+[ ] Task 8.4: Tạo Stat Card Component
+    File: Frontend/src/features/admin/components/StatCard.jsx
+
+    Props:
+    - title (string)
+    - value (number/string)
+    - icon (lucide icon component)
+    - trend (object: { value: +12, direction: 'up' })
+    - color (string: 'blue', 'green', 'yellow', 'red')
+
+    Display:
+    - Icon in colored circle
+    - Title (small, gray)
+    - Value (large, bold)
+    - Trend indicator (arrow + percentage)
+
+
+[ ] Task 8.5: Tạo Revenue Chart Component
+    File: Frontend/src/features/admin/components/RevenueChart.jsx
+
+    Library: recharts
+
+    Features:
+    - Line chart with smooth curves
+    - Tooltip on hover
+    - Responsive
+    - Period selector (Day, Week, Month, Year)
+    - Date range picker
+
+
+[ ] Task 8.6: Tạo Orders Pie Chart Component
+    File: Frontend/src/features/admin/components/OrdersPieChart.jsx
+
+    Library: recharts
+
+    Features:
+    - Donut chart
+    - Legend with status names
+    - Click to filter orders by status
+    - Tooltips showing count and percentage
+
+
+[ ] Task 8.7: Tạo Admin Stats API Service
+    File: Frontend/src/features/admin/services/statsApi.js
+
+    Functions:
+    - getOverviewStats()
+    - getRevenueStats(period, startDate, endDate)
+    - getOrdersByStatus()
+    - getTopProducts(limit)
+
+
+================================================================================
+THỨ TỰ THỰC HIỆN ĐỀ XUẤT
+================================================================================
+
+TUẦN 1: Backend Foundation + Admin Layout
+  Day 1-2:  Task 1.1 - 1.3 (Backend: Controller, Entity, Repository)
+  Day 3-4:  Task 1.4 - 1.6 (Backend: Service, DTO, Security)
+  Day 5-7:  Task 2.1 - 2.6 (Frontend: Admin Layout & Routes)
+
+TUẦN 2: Order Management UI
+  Day 1-3:  Task 3.1 - 3.3 (Order List Page + Components)
+  Day 4-7:  Task 3.4 - 3.7 (Order Detail Page + Modals)
+
+TUẦN 3: UI Components + Testing
+  Day 1-2:  Task 4.1 - 4.5 (Reusable Components)
+  Day 3-5:  Task 5.1 - 5.2 (Backend Testing)
+  Day 6-7:  Task 6.1 - 6.4 (Documentation)
+
+TUẦN 4: User Management UI
+  Day 1-3:  Task 7.2 - 7.3 (User List & Detail Pages)
+  Day 4-5:  Task 7.4 - 7.5 (Create User + API Service)
+  Day 6-7:  Testing & Bug fixes
+
+TUẦN 5: Dashboard Analytics
+  Day 1-2:  Task 8.1 - 8.2 (Backend Stats APIs)
+  Day 3-5:  Task 8.3 - 8.6 (Dashboard Page + Charts)
+  Day 6-7:  Task 8.7 + Final Testing
+
+
+================================================================================
+CHECKLIST TRƯỚC KHI BẮT ĐẦU
+================================================================================
+
+[ ] MySQL 8 server đang chạy
+[ ] Redis server đang chạy (cho JWT blacklist)
+[ ] Backend đang chạy thành công (./mvnw spring-boot:run)
+[ ] Frontend đang chạy thành công (npm run dev)
+[ ] Có tài khoản ADMIN để test (admin@pandamall.com / admin123)
+[ ] Git repository đã commit code hiện tại (để dễ rollback nếu có vấn đề)
+
+
+================================================================================
+DEPENDENCIES CẦN THÊM (NẾU CHƯA CÓ)
+================================================================================
+
+BACKEND:
+  [ ] Đã có đầy đủ dependencies (Spring Boot, JPA, Redis, WebFlux)
+  [ ] Không cần thêm gì
+
+FRONTEND:
+  [ ] recharts - npm install recharts (cho charts)
+  [ ] react-datepicker - npm install react-datepicker (cho date picker)
+  [ ] date-fns - npm install date-fns (date formatting)
+
+
+================================================================================
+NOTES & TIPS
+================================================================================
+
+1. GIT WORKFLOW:
+   - Tạo branch mới: git checkout -b feature/admin-order-management
+   - Commit thường xuyên sau mỗi task hoàn thành
+   - Test kỹ trước khi merge vào main
+
+2. TESTING:
+   - Test mỗi endpoint backend bằng Postman/Insomnia trước khi làm frontend
+   - Test authorization - đảm bảo customer không truy cập được admin routes
+   - Test với nhiều trường hợp: success, validation error, unauthorized
+
+3. CODE QUALITY:
+   - Tuân thủ naming conventions hiện tại
+   - Thêm comments cho logic phức tạp
+   - Reuse components khi có thể
+   - DRY principle (Don't Repeat Yourself)
+
+4. SECURITY:
+   - Luôn validate input ở backend
+   - Không tin tưởng data từ client
+   - Log tất cả admin actions (OrderHistory)
+   - Sensitive data không log ra console production
+
+5. PERFORMANCE:
+   - Pagination cho tất cả danh sách
+   - Index database columns thường query (orderId, userId, status, createdAt)
+   - Lazy loading cho images
+   - Debounce cho search inputs
+
+6. UX/UI:
+   - Loading states cho mọi async operations
+   - Error messages rõ ràng, hữu ích
+   - Confirmation modals cho destructive actions (delete, cancel)
+   - Toast notifications cho feedback
+   - Responsive design - test trên mobile
+
+
+================================================================================
+SUCCESS CRITERIA
+================================================================================
+
+PHASE 1 HOÀN THÀNH KHI:
+  [ ] Admin có thể login và truy cập /admin
+  [ ] Admin thấy danh sách tất cả đơn hàng (không chỉ của mình)
+  [ ] Admin có thể filter, search, sort đơn hàng
+  [ ] Admin có thể xem chi tiết đơn hàng
+  [ ] Admin có thể cập nhật status: PENDING → CONFIRMED → SHIPPING → DELIVERED
+  [ ] Admin có thể hủy đơn hàng với lý do
+  [ ] Admin có thể thêm ghi chú nội bộ vào đơn hàng
+  [ ] Order history hiển thị đầy đủ timeline các thay đổi
+  [ ] Customer KHÔNG thể truy cập /admin/* routes
+  [ ] Staff có thể quản lý đơn hàng (như Admin)
+  [ ] Tất cả actions được log vào OrderHistory
+  [ ] Backend tests pass
+  [ ] Frontend responsive trên mobile
+  [ ] Documentation được update
+
+PHASE 2 HOÀN THÀNH KHI:
+  [ ] Admin thấy danh sách tất cả users
+  [ ] Admin có thể tạo user mới với role ADMIN/STAFF/CUSTOMER
+  [ ] Admin có thể edit user info (name, email, role, status)
+  [ ] Admin có thể suspend/activate user
+  [ ] Admin có thể xem order history của từng user
+  [ ] Admin có thể delete user (soft delete)
+
+PHASE 3 HOÀN THÀNH KHI:
+  [ ] Dashboard hiển thị stats tổng quan (orders, revenue, customers)
+  [ ] Revenue chart hiển thị đúng theo period (day/week/month/year)
+  [ ] Orders by status chart hiển thị đúng distribution
+  [ ] Recent orders table hiển thị đơn mới nhất
+  [ ] Top products table hiển thị sản phẩm bán chạy
+  [ ] Charts responsive và load nhanh
+
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+Nếu gặp vấn đề:
+  - Check backend logs: Backend/logs/ hoặc console output
+  - Check frontend console: Browser DevTools
+  - Check CLAUDE.md files: /CLAUDE.md, /Backend/CLAUDE.md, /Frontend/CLAUDE.md
+  - Check security docs: SECURITY_FIX_CART_ORDER_ISOLATION.md
+
+
+================================================================================
+END OF IMPLEMENTATION PLAN
+================================================================================
+
+File này sẽ được cập nhật khi có thay đổi hoặc khi hoàn thành các tasks.
+Đánh dấu [x] vào checkbox khi hoàn thành mỗi task.
+
+Last updated: 2025-11-03
