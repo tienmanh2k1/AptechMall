@@ -8,7 +8,9 @@ import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.Status;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -23,7 +25,7 @@ public class UserManagementService {
 
     private UserResponseDTO toDTO(User user) {
         UserResponseDTO dto = new UserResponseDTO();
-        dto.setUserId(user.getUserId());
+        dto.setUserId(user.getId());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
         dto.setFullName(user.getFullName());
@@ -38,11 +40,9 @@ public class UserManagementService {
         return dto;
     }
 
-    public List<UserResponseDTO> getAllUsers() {
-        return userRepository.findAll()
-                .stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+    public Page<UserResponseDTO> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(this::toDTO);
     }
 
     public Optional<UserResponseDTO> getUserById(Long id) {

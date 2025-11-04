@@ -4,6 +4,9 @@ import com.aptech.aptechMall.dto.user.UserResponseDTO;
 import com.aptech.aptechMall.dto.user.UserUpdateDTO;
 import com.aptech.aptechMall.service.admin.UserManagementService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,8 +23,10 @@ public class UsersDataController {
     private final UserManagementService service;
 
     @GetMapping("/")
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        List<UserResponseDTO> users = service.getAllUsers();
+    public ResponseEntity<Page<UserResponseDTO>> getAllUsers(@RequestParam(name = "page", defaultValue = "0") int page,
+                                                             @RequestParam(name = "size", defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserResponseDTO> users = service.getAllUsers(pageable);
         return ResponseEntity.ok(users);
     }
 

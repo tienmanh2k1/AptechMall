@@ -58,7 +58,7 @@ public class JwtService {
     private Map<String, Object> extractClaims(User user, String tokenType) {
         Map<String, Object> claims = new HashMap<>();
 
-        claims.put("userId", user.getUserId());
+        claims.put("userId", user.getId());
         claims.put("role", user.getRole().name());
         claims.put("type", tokenType);
         claims.put("email", user.getEmail());
@@ -102,6 +102,15 @@ public class JwtService {
         Object userIdObj = claims.get("userId");
         if (userIdObj instanceof Number) {
             return ((Number) userIdObj).longValue();
+        }
+        return null;
+    }
+
+    public String extractEmail(String token){
+        Claims claims = extractAllClaims(token);
+        Object emailObj = claims.get("email");
+        if (emailObj instanceof String) {
+            return (String) emailObj;
         }
         return null;
     }

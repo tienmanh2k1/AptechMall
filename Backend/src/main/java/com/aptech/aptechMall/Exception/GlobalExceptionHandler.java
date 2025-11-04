@@ -5,6 +5,8 @@ import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -249,6 +251,84 @@ public class GlobalExceptionHandler {
                     .status(HttpStatus.BAD_REQUEST)
                     .body(error);
         }
+    }
+
+    // ===== Authentication & Authorization Exceptions =====
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
+        log.error("Invalid Credentials: {}", ex.getMessage(), ex);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Unauthorized");
+        response.put("message", "Invalid username or password");
+        response.put("status", 401);
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(response);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUsernameNotFound(UsernameNotFoundException ex) {
+        log.error("Username not found: {}", ex.getMessage(), ex);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Not Found");
+        response.put("message", "User not found");
+        response.put("status", 404);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(response);
+    }
+
+    @ExceptionHandler(UsernameAlreadyTaken.class)
+    public ResponseEntity<Map<String, Object>> handleUsernameAlreadyTaken(UsernameAlreadyTaken ex) {
+        log.error("Username Taken: {}", ex.getMessage(), ex);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Conflict");
+        response.put("message", ex.getMessage());
+        response.put("status", 409);
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(response);
+    }
+
+    @ExceptionHandler(AccountSuspendedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountSuspended(AccountSuspendedException ex) {
+        log.error("Account Suspended: {}", ex.getMessage(), ex);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Forbidden");
+        response.put("message", ex.getMessage());
+        response.put("status", 403);
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(response);
+    }
+    @ExceptionHandler(AccountDeletedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountDeleted(AccountDeletedException ex) {
+        log.error("Account Deleted: {}", ex.getMessage(), ex);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Not Found");
+        response.put("message", ex.getMessage());
+        response.put("status", 404);
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(response);
+    }
+    @ExceptionHandler(AccountNotActiveException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountInactive(AccountNotActiveException ex) {
+        log.error("Account Inactive: {}", ex.getMessage(), ex);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "Unauthorized");
+        response.put("message", ex.getMessage());
+        response.put("status", 401);
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(response);
     }
 
     // ===== Generic Exception =====

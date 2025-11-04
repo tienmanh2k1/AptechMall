@@ -15,6 +15,8 @@ import java.util.UUID;
 public class FileUploadService {
     private final Path avatarUploadDir = Paths.get("uploads/avatars");
 
+    private static final String AVATAR_URL_PREFIX = "/uploads/avatars/";
+
     public FileUploadService() throws IOException {
         List<Path> pathVariables = List.of((
                 avatarUploadDir
@@ -31,6 +33,6 @@ public class FileUploadService {
         String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
         Path targetPath = avatarUploadDir.resolve(filename);
         Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-        return "/uploads/avatars/" + filename;
+        return AVATAR_URL_PREFIX + filename;
     }
 }

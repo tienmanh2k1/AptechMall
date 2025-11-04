@@ -1,54 +1,79 @@
 package com.aptech.aptechMall.model.jpa;
+
+import com.aptech.aptechMall.model.converters.OAuthConverter;
 import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.Status;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
+/**
+ * User entity representing registered users in the system
+ * Supports authentication and order management
+ */
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        @Index(name = "idx_email", columnList = "email")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Getter
 public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name="user_id")
+    private Long Id;
 
-    @Column(unique = true, length = 30)
+    @Column(nullable = false, unique = true, length = 30)
     private String username;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
-    private String password;
-
-    @Column(name = "email", length = 30, unique = true, nullable = false)
+    @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(name="full_name", length=191, nullable = false)
+    @Column(nullable = false)
+    private String password;
+
+    @Column(nullable = false, length = 100)
     private String fullName;
 
-    @Column(name = "avatar_url", length = 512)
-    private String avatarUrl;
-
-    @Column(name = "email_verified", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
-    private boolean emailVerified;
-
-    @Column(name = "phone", length = 20)
+    @Column(length = 20)
     private String phone;
+
+    @Column(length = 500)
+    private String address;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime registeredAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name="last_login")
+    private LocalDateTime lastLogin;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = OAuthConverter.class)
+    @Column(columnDefinition = "json")
+    private Map<String, Object> oAuth = new HashMap<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserAddresses> userAddresses = new HashSet<>();
 
     @Column(nullable = false, columnDefinition = "ENUM('ADMIN', 'STAFF', 'CUSTOMER') DEFAULT 'CUSTOMER'")
     @Enumerated(EnumType.STRING)
@@ -58,19 +83,11 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     private Status status;
 
-    @Column(name = "registered_at", nullable = false, updatable = false)
-    @CreationTimestamp
-    private LocalDateTime registeredAt;
+    @Column(name = "avatar_url", length = 512)
+    private String avatarUrl;
 
-    @Column(name = "updated_at", nullable = false)
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
-
-    @Column(name="last_login")
-    private LocalDateTime lastLogin;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<UserAddresses> userAddresses = new HashSet<>();
+    @Column(name = "email_verified", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean emailVerified;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

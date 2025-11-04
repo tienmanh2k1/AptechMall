@@ -1,14 +1,13 @@
 package com.aptech.aptechMall.service.authentication;
 
-import com.aptech.aptechMall.Exception.UsernameAlreadyTaken;
+import com.aptech.aptechMall.Exception.*;
+
 import com.aptech.aptechMall.model.jpa.User;
 import com.aptech.aptechMall.repository.UserRepository;
 import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.requests.*;
 import com.aptech.aptechMall.service.FileUploadService;
-import io.jsonwebtoken.*;
 import jakarta.persistence.EntityExistsException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,10 +16,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -57,26 +55,14 @@ public class AuthService {
                     .lastLogin(user.getLastLogin())
                     .build();
 
-        } catch (ExpiredJwtException e) {
-            System.err.println("JWT expired: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return null;
-        } catch (JwtException e) {
-            System.err.println("Invalid JWT: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return null;
-        } catch (UsernameNotFoundException e) {
-            System.err.println("User not found: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            return null;
         } catch (Exception e) {
-            System.err.println("Unexpected error in getProfile: " + e.getMessage());
+            log.error("Unexpected error in getProfile: " + e.getMessage());
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return null;
         }
     }
 
-    public ProfileResponse updateProfile(HttpServletRequest request, HttpServletResponse response, UpdateProfile updatedProfile, MultipartFile avatar){
+    public ProfileResponse updateProfile(HttpServletRequest request, HttpServletResponse response, UpdateProfile updatedProfile){
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new IllegalArgumentException("Missing or invalid Authorization header");
@@ -84,7 +70,7 @@ public class AuthService {
         try {
             String subject = jwtService.extractUsername(authHeader.substring(7));
             boolean hasUsername = userRepository.existsByUsername(subject);
-            String avatarFilePath = avatar != null ? fileUploadService.saveAvatar(avatar) : updatedProfile.getAvatarUrl();
+            String avatarFilePath = updatedProfile.getAvatar() != null ? fileUploadService.saveAvatar(updatedProfile.getAvatar()) : updatedProfile.getAvatarUrl();
 
             User user = hasUsername ? userRepository.findByUsername(subject).orElseThrow() :
                     userRepository.findByEmail(subject).orElseThrow(() -> new UsernameNotFoundException("Can't retrieve Profile because User is null"));
@@ -106,20 +92,8 @@ public class AuthService {
                     .lastLogin(user.getLastLogin())
                     .build();
 
-        } catch (ExpiredJwtException e) {
-            System.err.println("JWT expired: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return null;
-        } catch (JwtException e) {
-            System.err.println("Invalid JWT: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return null;
-        } catch (UsernameNotFoundException e) {
-            System.err.println("User not found: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            return null;
         } catch (Exception e) {
-            System.err.println("Unexpected error in getProfile: " + e.getMessage());
+            log.error("Unexpected error in getProfile: " + e.getMessage());
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return null;
         }
@@ -130,10 +104,7 @@ public class AuthService {
             throw new UsernameAlreadyTaken("Username " +request.getUsername() + " already taken");
         }
 
-        // Set default role to CUSTOMER if not provided or use provided role
-        Role role = (request.getRole() == null || request.getRole().trim().isEmpty())
-                ? Role.CUSTOMER
-                : Role.fromString(request.getRole());
+        Role role = Role.CUSTOMER;
 
         User user = User.builder()
                 .username(request.getUsername())
@@ -152,70 +123,65 @@ public class AuthService {
         boolean existUsername = userRepository.existsByUsername(request.getUsername());
         User user = existUsername ?
                 userRepository.findByUsername(request.getUsername())
-                    .orElseThrow(() -> new UsernameNotFoundException("Người dùng không tồn tại")) :
+                        .orElseThrow(() -> new UsernameNotFoundException("User Does not exists")) :
                 userRepository.findByEmail(request.getUsername())
-                        .orElseThrow(() -> new UsernameNotFoundException("Người dùng không tồn tại"));
+                        .orElseThrow(() -> new UsernameNotFoundException("User Does not exists"));
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword()) || request.getPassword().isEmpty()) {
-            throw new BadCredentialsException("Thông tin đăng nhập không hợp lệ");
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())
+                || request.getPassword().isEmpty()) {
+            throw new BadCredentialsException("Incorrect login info");
         }
 
-        String accessJwt = jwtService.generateToken(existUsername ? user.getUsername() : user.getEmail(), "access_token");
-        String refreshJwt = jwtService.generateToken(existUsername ? user.getUsername() : user.getEmail(), "refresh_token");
-        Cookie refreshTokenCookie = getRefreshTokenCookie(refreshJwt);
-        setCookieAttribute(response, refreshTokenCookie);
-        user.setLastLogin(LocalDateTime.now());
-        userRepository.save(user);
-        return new AuthResponse(accessJwt);
+        switch (user.getStatus()){
+            case SUSPENDED -> throw new AccountSuspendedException("Your account has been suspended. Please contact support.");
+            case DELETED -> throw new AccountDeletedException("This account were marked as removed and may no longer be able to login");
+            case ACTIVE -> {
+                if (passwordEncoder.matches("", user.getPassword())) throw new BadCredentialsException("You can only login through third party OAuth");
+
+                String accessJwt = jwtService.generateToken(user.getUsername(), "access_token");
+                String refreshJwt = jwtService.generateToken(user.getUsername(), "refresh_token");
+
+                redisService.saveToken(user.getEmail(), refreshJwt, JwtService.REFRESH_TOKEN_TTL.getSeconds());
+
+                user.setLastLogin(LocalDateTime.now());
+                userRepository.save(user);
+                log.info("User " + user.getUsername() + " has logged in at " + user.getLastLogin());
+                return new AuthResponse(accessJwt);
+            }
+            default -> throw new AccountNotActiveException("Account is not active or does not have a valid status identifiers. Please contact support.");
+        }
     }
 
     public AuthResponse refreshToken(HttpServletRequest request, HttpServletResponse response) {
-        var refreshTokenCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh_token")).findFirst().orElseThrow();
-        var currentRefreshToken = refreshTokenCookie.getValue();
+        String accessToken = request.getHeader("Authorization").substring(7);
+        String email = jwtService.extractEmail(accessToken);
 
         // Check token blacklist if Redis is available
         try {
-            if(redisService.hasToken(currentRefreshToken))
+            if(redisService.getToken(email) != null)
                 throw new EntityExistsException("Refresh Token haven't yet been invalidated or expired");
         } catch (Exception e) {
             log.warn("Redis not available for token blacklist check: " + e.getMessage());
         }
 
-        revokeToken(currentRefreshToken);
+        String currentRefreshToken = redisService.getToken(email);
+
+
         if(currentRefreshToken != null) {
+            revokeToken(currentRefreshToken);
             if(jwtService.validateToken(currentRefreshToken)) {
                 var username = jwtService.extractUsername(currentRefreshToken);
                 String jwt = jwtService.generateToken(username, "access_token");
                 String newRefreshToken = jwtService.generateToken(username, "refresh_token");
-                refreshTokenCookie = getRefreshTokenCookie(newRefreshToken);
-                setCookieAttribute(response, refreshTokenCookie);
+
+                if (redisService.deleteToken(email)) {
+                    redisService.saveToken(email, newRefreshToken, JwtService.REFRESH_TOKEN_TTL.getSeconds());
+                }
+
                 return new AuthResponse(jwt);
             }
         }
         return null;
-    }
-
-    private Cookie getRefreshTokenCookie(String refreshToken){
-        var cookieMaxAge = (int) (jwtService.extractExpiration(refreshToken).getTime() - System.currentTimeMillis()) / 1000;
-        if(cookieMaxAge < 0)
-            cookieMaxAge = 0;
-
-        Cookie refreshTokenCookie = new Cookie("refresh_token", refreshToken);
-        refreshTokenCookie.setMaxAge(cookieMaxAge);
-        refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(true);
-        refreshTokenCookie.setPath("/");
-
-        return refreshTokenCookie;
-    }
-
-    private void setCookieAttribute(HttpServletResponse response, Cookie refreshTokenCookie){
-        response.addCookie(refreshTokenCookie); // add cookie vao React frontend
-        String sameSiteAttribute = "; SameSite=None";
-        String header = response.getHeader("Set-Cookie");
-        if (header != null && !header.contains("SameSite=")) {
-            response.setHeader("Set-Cookie", header + sameSiteAttribute);
-        }
     }
 
     public void preRegister(RegisterRequest request) {
@@ -228,16 +194,23 @@ public class AuthService {
                 .email(request.getEmail())
                 .role(role)
                 .build();
+        user.setEmailVerified(true);
 
         userRepository.save(user);
     }
 
     public void logout(HttpServletRequest request, HttpServletResponse response) {
-        String accessToken = request.getHeader("Authorization");
-        Cookie refreshTokenCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh_token")).findFirst().orElseThrow();
-        revokeToken(accessToken.substring(7));
-        revokeToken(refreshTokenCookie.getValue());
-        revokeRefreshTokenCookie(response, refreshTokenCookie);
+        try {
+            String accessToken = request.getHeader("Authorization").substring(7);
+            String email = jwtService.extractEmail(accessToken);
+
+            revokeToken(redisService.getToken(email));
+            revokeToken(accessToken);
+            redisService.deleteToken(email);
+
+        } catch (Exception e) {
+            log.error("Logout Failure: " + e.getMessage());
+        }
     }
 
     private void revokeToken(String token) {
@@ -250,13 +223,6 @@ public class AuthService {
         }
     }
 
-    private void revokeRefreshTokenCookie(HttpServletResponse response, Cookie refreshTokenCookie) {
-        refreshTokenCookie.setMaxAge(0);
-        refreshTokenCookie.setSecure(true);
-        refreshTokenCookie.setPath("/");
-        setCookieAttribute(response, refreshTokenCookie);
-    }
-
     public boolean verifyUserExists(String username){
         return userRepository.existsByUsername(username);
     }
@@ -267,33 +233,52 @@ public class AuthService {
     public AuthResponse authenticateGoogle(AuthRequest request){
         User user; String accessJwt;
 
-        user = userRepository.findByEmail(request.getUsername()).orElseGet(() -> {
+        user = userRepository.findByOAuthEmail(request.getEmail(), request.getGoogleSub()).orElseGet(() -> {
+            Map<String, Object> oAuthGoogle = new HashMap<>();
+            oAuthGoogle.put("provider", "google");
+            oAuthGoogle.put("sub", request.getGoogleSub());
+            oAuthGoogle.put("email", request.getEmail());
+            oAuthGoogle.put("verified", true);
+
             User newUser = new User();
-            newUser.setEmail(request.getUsername());
+            newUser.setEmail(request.getEmail());
             newUser.setFullName(request.getFullname());
-            newUser.setPassword(passwordEncoder.encode("")); //temporarily set as blank as OAuth doesn't set password for you, login will not authenticate if password is blank
+            newUser.setUsername(request.getUsername()); //Let frontend set username during registration before request hit backend
+            newUser.setPassword(passwordEncoder.encode("")); //Should let Frontend handle setting password during registration
             newUser.setEmailVerified(true);
+            newUser.setOAuth(oAuthGoogle);
             return userRepository.save(newUser);
-        });;
-        accessJwt = jwtService.generateToken(user, "access_token");
-        user.setLastLogin(LocalDateTime.now());
-        userRepository.save(user);
+        });
 
-        return new AuthResponse(accessJwt);
-
+        switch (user.getStatus()){
+            case SUSPENDED -> throw new AccountSuspendedException("Your account has been suspended. Please contact support.");
+            case DELETED -> throw new AccountDeletedException("This account were marked as removed and may no longer be able to login");
+            case ACTIVE -> {
+                Map<String, Object> oauth = user.getOAuth();
+                boolean isVerified = (Boolean) oauth.getOrDefault("verified", false);
+                if (isVerified){
+                    accessJwt = jwtService.generateToken(user, "access_token");
+                    user.setLastLogin(LocalDateTime.now());
+                    userRepository.save(user);
+                    log.info("Google Auth successfully authenticated for " + request.getEmail());
+                    return new AuthResponse(accessJwt);
+                }
+                return null;
+            }
+            default -> throw new AccountNotActiveException("Account is not active or does not have a valid status identifiers. Please contact support.");
+        }
     }
 
     public void generateRefreshTokenCookie(HttpServletRequest request, HttpServletResponse response){
         String accessToken = request.getHeader("Authorization");
         try {
-            String subject = jwtService.extractUsername(accessToken.substring(7));
+            String subject = jwtService.extractEmail(accessToken.substring(7));
             String refreshJwt = jwtService.generateToken(subject, "refresh_token");
 
-            Cookie refreshTokenCookie = getRefreshTokenCookie(refreshJwt);
-            setCookieAttribute(response, refreshTokenCookie);
+            redisService.saveToken(subject, refreshJwt, JwtService.REFRESH_TOKEN_TTL.getSeconds());
 
         } catch (Exception e) {
-            System.err.println("Error extracting subject from JWT: " + e.getMessage());
+            log.error("Error extracting subject from JWT: " + e.getMessage());
         }
     }
 
@@ -305,25 +290,32 @@ public class AuthService {
         try {
             User user = userRepository.findByEmail(credential.getOldEmail()).orElseThrow(() -> new UsernameNotFoundException("Email not in Database"));
             boolean existUsername = userRepository.existsByUsername(user.getUsername());
-            if (!passwordEncoder.matches(credential.getOldPassword(), user.getPassword())){
-                throw new BadCredentialsException("Old Password does not match");
+
+            if (!credential.getPassword().isEmpty()){
+                if (passwordEncoder.matches("", user.getPassword())) {
+                    user.setPassword(passwordEncoder.encode(credential.getPassword()));
+                } else {
+                    if (!passwordEncoder.matches(credential.getOldPassword(), user.getPassword())){
+                        throw new BadCredentialsException("Old Password does not match");
+                    }
+                    user.setPassword(passwordEncoder.encode(credential.getPassword()));
+                }
             }
-            user.setPassword(passwordEncoder.encode(credential.getPassword()));
 
             if(!credential.getEmail().equals(credential.getOldEmail())){
                 user.setEmail(credential.getEmail());
-                var tokenCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh_token")).findFirst().orElseThrow();
-                var currentRefreshToken = tokenCookie.getValue();
+                String currentRefreshToken = redisService.getToken(credential.getOldEmail());
+
                 String refreshJwt = jwtService.generateToken(existUsername ? user.getUsername() : user.getEmail(), "refresh_token");
 
-                Cookie refreshTokenCookie = getRefreshTokenCookie(refreshJwt);
-                setCookieAttribute(response, refreshTokenCookie);
                 revokeToken(currentRefreshToken);
+                redisService.deleteToken(credential.getOldEmail());
+                redisService.saveToken(credential.getEmail(), refreshJwt, JwtService.REFRESH_TOKEN_TTL.getSeconds());
             }
             userRepository.save(user);
 
         } catch (Exception e) {
-            System.err.println("Error extracting subject from JWT: " + e.getMessage());
+            log.error("Error extracting subject from JWT: " + e.getMessage());
         }
     }
 }

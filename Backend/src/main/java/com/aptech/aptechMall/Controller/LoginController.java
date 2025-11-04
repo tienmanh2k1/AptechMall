@@ -5,11 +5,11 @@ import com.aptech.aptechMall.service.authentication.AuthService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +23,7 @@ public class LoginController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<RegisterResponse> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
 
@@ -60,13 +60,19 @@ public class LoginController {
     }
 
     @PostMapping("/profile")
-    public ResponseEntity<ProfileResponse> updateProfile(HttpServletRequest request, HttpServletResponse response, @RequestBody UpdateProfile info,
-                                                         @RequestPart(value = "avatar", required = false) MultipartFile avatar){
-        return ResponseEntity.ok(authService.updateProfile(request, response, info, avatar));
+    public ResponseEntity<ProfileResponse> updateProfile(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            @ModelAttribute UpdateProfile info // maps fields + optional file
+    ) {
+        return ResponseEntity.ok(
+                authService.updateProfile(request, response, info)
+        );
     }
 
+
     @PostMapping("/update-credentials")
-    public ResponseEntity<String> updateAccountCredentials(HttpServletRequest request, HttpServletResponse response, @RequestBody UpdateCredential credentials){
+    public ResponseEntity<String> updateAccountCredentials(HttpServletRequest request, HttpServletResponse response, @Valid @RequestBody UpdateCredential credentials){
         authService.updateEmailOrPassword(request, response, credentials);
         return ResponseEntity.ok("Credentials Updated");
     }
@@ -77,8 +83,8 @@ public class LoginController {
         RegisterRequest request1 = new RegisterRequest("VanA", "123456", "Nguyen Van A", "ADMIN", "NguyenVanA@gmail.com");
         RegisterRequest request2 = new RegisterRequest("VanB", "123456", "Nguyen Van B", "STAFF", "NguyenVanB@gmail.com");
         RegisterRequest request3 = new RegisterRequest("VanC", "123456", "Nguyen Van C", "CUSTOMER", "NguyenVanC@gmail.com");
-        RegisterRequest request4 = new RegisterRequest(null, "demo123", "Demo User", "CUSTOMER", "demo.account@gmail.com");
-        RegisterRequest request5 = new RegisterRequest(null, "admin123", "Demo Admin", "ADMIN", "admin@pandamall.com");
+        RegisterRequest request4 = new RegisterRequest("Demo", "demo123", "Demo User", "CUSTOMER", "demo.account@gmail.com");
+        RegisterRequest request5 = new RegisterRequest("Admin", "admin123", "Demo Admin", "ADMIN", "admin@pandamall.com");
 
         preRegistrations.add(request1);
         preRegistrations.add(request2);
