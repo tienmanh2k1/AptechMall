@@ -16,6 +16,10 @@ import Loading from '../../../shared/components/Loading';
 import ErrorMessage from '../../../shared/components/ErrorMessage';
 import { Shield, Truck, ShoppingCart } from 'lucide-react';
 import { isValidMarketplace, getMarketplaceInfo } from '../../../shared/utils/marketplace';
+// Translation imports
+import useProductTranslation from '../../translation/hooks/useProductTranslation';
+import TranslationToggle from '../../translation/components/TranslationToggle';
+import { transformForTranslation, applyTranslationsToBackend } from '../../translation/utils/productAdapter';
 
 const ProductDetailPage = () => {
   const { platform, id } = useParams();
@@ -28,6 +32,24 @@ const ProductDetailPage = () => {
   const [currentImages, setCurrentImages] = useState([]);
   const [currentPrice, setCurrentPrice] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
+
+  // Translation setup
+  const flatProduct = product ? transformForTranslation(product) : null;
+  const {
+    displayProduct,
+    isTranslating,
+    showOriginal,
+    toggleLanguage,
+    hasTranslation,
+    error: translationError
+  } = useProductTranslation(flatProduct, platform, {
+    autoTranslate: true,
+    delayMs: 500  // Only 1 request (title only), no need for long delay
+  });
+
+  const translatedBackendProduct = displayProduct && product
+    ? applyTranslationsToBackend(displayProduct, product)
+    : product;
 
   const fetchProduct = useCallback(async () => {
     try {
@@ -83,8 +105,8 @@ const ProductDetailPage = () => {
     }
 
     // Update images if variant has specific image
-    if (variant?.variantImage && product?.Result?.Item) {
-      const backendItem = product.Result.Item;
+    if (variant?.variantImage && translatedBackendProduct?.Result?.Item) {
+      const backendItem = translatedBackendProduct.Result.Item;
 
       // Find the full picture object for the variant image
       const variantPicture = backendItem.Pictures?.find(p =>
@@ -97,14 +119,14 @@ const ProductDetailPage = () => {
         setCurrentImages([variantPicture.Url, ...otherImages.map(p => p.Url)]);
       }
     }
-  }, [product]);
+  }, [translatedBackendProduct]);
 
   // Handle add to cart
   const handleAddToCart = useCallback(async () => {
-    if (!product?.Result?.Item) return;
+    if (!translatedBackendProduct?.Result?.Item) return;
 
     try {
-      const backendItem = product.Result.Item;
+      const backendItem = translatedBackendProduct.Result.Item;
       const hasVariants = backendItem.Attributes?.some(attr => attr.IsConfigurator) || false;
 
       // Validation: Check if product has variants but none selected
@@ -189,7 +211,7 @@ const ProductDetailPage = () => {
     } finally {
       setAddingToCart(false);
     }
-  }, [product, platform, currentPrice, currentImages, selectedVariant, refreshCart]);
+  }, [translatedBackendProduct, platform, currentPrice, currentImages, selectedVariant, refreshCart]);
 
   if (loading) {
     return <Loading message="Loading product details..." />;
@@ -199,13 +221,13 @@ const ProductDetailPage = () => {
     return <ErrorMessage message={error} onRetry={fetchProduct} />;
   }
 
-  if (!product || !product.Result || !product.Result.Item) {
+  if (!translatedBackendProduct || !translatedBackendProduct.Result || !translatedBackendProduct.Result.Item) {
     return <ErrorMessage message="Product not found" onRetry={fetchProduct} />;
   }
 
-  const backendItem = product.Result.Item;
-  const backendVendor = product.Result.Vendor;
-  const backendRootPath = product.Result.RootPath;
+  const backendItem = translatedBackendProduct.Result.Item;
+  const backendVendor = translatedBackendProduct.Result.Vendor;
+  const backendRootPath = translatedBackendProduct.Result.RootPath;
 
   // Normalize backend response (Pascal case) to expected format (lowercase)
   const normalizedProduct = {
@@ -248,7 +270,7 @@ const ProductDetailPage = () => {
   const { item, delivery, service, seller } = normalizedProduct.result;
 
   // Get marketplace display info from product data (backend is source of truth)
-  const marketplaceInfo = getMarketplaceInfo(product.platform || platform);
+  const marketplaceInfo = getMarketplaceInfo(translatedBackendProduct.platform || platform);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -260,6 +282,18 @@ const ProductDetailPage = () => {
           </span>
         </div>
       )}
+
+      {/* Translation Toggle */}
+      <div className="mb-6">
+        <TranslationToggle
+          showOriginal={showOriginal}
+          onToggle={toggleLanguage}
+          isTranslating={isTranslating}
+          hasTranslation={hasTranslation}
+          sourceLang={platform === '1688' ? 'ZH' : 'EN'}
+          targetLang="VI"
+        />
+      </div>
 
       {/* Product Images and Info Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

@@ -43,22 +43,30 @@ const ProductVariantSelector = ({ attributes, configuredItems, onVariantChange }
 
   // State to track selected options for each property
   const [selectedOptions, setSelectedOptions] = useState({});
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize with first option of each property
+  // Initialize with first option of each property (only once)
   useEffect(() => {
+    // Skip if already initialized
+    if (isInitialized) return;
+    if (Object.keys(propertyGroups).length === 0) return;
+
     const initialSelections = {};
     Object.entries(propertyGroups).forEach(([propertyName, group]) => {
       if (group.options.length > 0) {
         initialSelections[group.propertyId] = group.options[0].valueId;
       }
     });
+
     setSelectedOptions(initialSelections);
-  }, [propertyGroups]);
+    setIsInitialized(true);
+  }, [propertyGroups, isInitialized]);
 
   // When selections change, find matching configured item
   useEffect(() => {
     if (Object.keys(selectedOptions).length === 0) return;
     if (!configuredItems) return;
+    if (!onVariantChange) return;
 
     // Find configured item that matches selected options
     const matchingItem = configuredItems.find(item => {
@@ -72,7 +80,7 @@ const ProductVariantSelector = ({ attributes, configuredItems, onVariantChange }
       });
     });
 
-    if (matchingItem && onVariantChange) {
+    if (matchingItem) {
       // Find the attribute with image for the selected color/variant
       const selectedImageAttr = configuratorAttrs.find(attr =>
         attr.ImageUrl && selectedOptions[attr.Pid] === attr.Vid
@@ -86,7 +94,8 @@ const ProductVariantSelector = ({ attributes, configuredItems, onVariantChange }
         variantImage: selectedImageAttr?.ImageUrl
       });
     }
-  }, [selectedOptions, configuredItems, onVariantChange, configuratorAttrs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOptions]); // Only re-run when selectedOptions changes
 
   const handleOptionSelect = (propertyId, valueId) => {
     setSelectedOptions(prev => ({
