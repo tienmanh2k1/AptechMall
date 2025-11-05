@@ -15,7 +15,9 @@ import {
   Phone,
   MapPin,
   Globe,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Ban,
+  CheckCircle
 } from 'lucide-react';
 
 const AdminUserManagementPage = () => {
@@ -36,12 +38,11 @@ const AdminUserManagementPage = () => {
     address: ''
   });
   const [errors, setErrors] = useState({});
-    
-  useEffect(() => {
-    const fetchUsers = async () => {
+  
+  const fetchUsers = async () => {
+      setLoading(true);
       try {
       const authUsers = await getAllUsers();
-      console.log("📦 getAllUsers() returned:", authUsers);
       setUsers(authUsers);
     } catch (error){
       console.error("Problem fetching users: ", error);
@@ -50,6 +51,8 @@ const AdminUserManagementPage = () => {
       setLoading(false);
     }
     }
+    
+  useEffect(() => {
     fetchUsers();
   }, [])
 
@@ -60,9 +63,11 @@ const AdminUserManagementPage = () => {
       user.phone.includes(searchQuery),
   )
 
-  const handleEdit = (user) => {
-    setEditingUser(user)
-    setFormData({
+  const handleOpenModal = (user = null) => {
+    if (user) {
+      setEditingUser(user)
+      setFormData({
+      username: user.username,
       fullName: user.fullName,
       email: user.email,
       phone: user.phone,
@@ -70,31 +75,62 @@ const AdminUserManagementPage = () => {
       avatarUrl: user.avatarUrl || "",
       role: user.role?.toUpperCase(),
       status: user.status?.toUpperCase(),
-    })
+      })
+    } else {
+      setEditingUser(null)
+      setFormData({
+      username: "",
+      password: "",
+      fullName: "",
+      email: "",
+      phone: "",
+      address: "",
+      avatarUrl: "",
+      role: "CUSTOMER",
+      status: "ACTIVE",
+      })
+    }
     setShowModal(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm("Are you sure you want to delete this user?")) {
-      deleteUser(id)
+      try {
+        await deleteUser(id)
+        toast.success("USER DELETED");
+        fetchUsers();
+      } catch (error) {
+        const errorMessage = error.response.data.message || 
+                              error.response.data.error || 
+                                  'Failed to delete user. Please try again.';
+        toast.error(errorMessage);
+      }
     }
   }
 
-  const handleToggleStatus = (id) => {
-    const user = users.find(user => user.id === id);
+  const handleToggleStatus = async (id) => {
+    const user = users.find(user => user.userId === id);
     if (user){
-      setUsers(users.map((user) =>
-      user.id === id
+      try {
+        const res = await patchUser(user.userId, {
+            status: user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
+          })
+
+        if (res) setUsers(users.map((user) =>
+      user.userId === id
       ? {
           ...user,
           status: user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
         }
       : user
       ));
-
-      updateUser(user.id, {
-            status: user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
-          })
+      } catch (error) {
+        const errorMessage = error.response.data.message || 
+                              error.response.data.error || 
+                                  'Failed to set status to user. You do not have the priviledge or the server has issue.';
+        toast.error(errorMessage);
+      }
+      
     }
     
   };
@@ -103,31 +139,36 @@ const AdminUserManagementPage = () => {
     e.preventDefault()
 
     if (editingUser) {
-
-    const updatedUser = {
-      ...editingUser,
-      fullName: formData.fullName ?? editingUser.fullName,
-      email: formData.email ?? editingUser.email,
-      phone: formData.phone ?? editingUser.phone,
-      role: formData.role ?? editingUser.role,
-      status: formData.status ?? editingUser.status,
-      avatarUrl: formData.avatarUrl ?? editingUser.avatarUrl,
-    };
-
-    setUsers(users.map((user) => (user.id === editingUser.id ? updatedUser : user)));
-
-    updateUser(editingUser.id, {
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      role: formData.role,
-      status: formData.status,
-      avatarUrl: formData.avatarUrl,
+      updateUser(editingUser.userId, {
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        status: formData.status,
+        avatarUrl: formData.avatarUrl,
     });
-  }
-
+      fetchUsers();
+    } else {
+      createUser(formData)
+      fetchUsers();
+    }
     setShowModal(false);
   }
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingUser(null);
+    setFormData({
+      fullName: "",
+      email: "",
+      phone: "",
+      address: "",
+      avatarUrl: "",
+      role: "CUSTOMER",
+      status: "ACTIVE",
+    });
+    setErrors({});
+  };
 
 
   return (
@@ -215,8 +256,9 @@ const AdminUserManagementPage = () => {
                                     {user.fullName.charAt(0)}
                                   </div>
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
-                                  <p className="text-xs text-gray-500">Joined {user.createdAt}</p>
+                                  <p className="text-md font-medium text-gray-900">{user.username}</p>
+                                  <p className="text-sm font-medium text-gray-900">Full Name: {user.fullName}</p>
+                                  <p className="text-xs text-gray-500">Joined {user.registeredAt}</p>
                                 </div>
                                 </div>
                               </td>
@@ -245,6 +287,17 @@ const AdminUserManagementPage = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <div className="flex items-center justify-end gap-2">
                                     <button
+                                      onClick={() => handleToggleStatus(user.userId)}
+                                      className={
+                                        user.status === "ACTIVE"
+                                        ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                      }
+                                      title={user.status === "ACTIVE" ? "Ban user" : "Activate user"}
+                                    >
+                                      {user.status === "ACTIVE" ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                                    </button>
+                                    <button
                                       onClick={() => handleOpenModal(user)}
                                       className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
                                       title="Edit"
@@ -267,7 +320,115 @@ const AdminUserManagementPage = () => {
                     </div>
                   </div>
                 )}
+        {/* Modal */}
+        {showModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {editingUser ? 'Edit User' : 'Create New User'}
+                  </h2>
+                  <button
+                    onClick={handleCloseModal}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                  {/* Username */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="Tên đăng nhập"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                  </div>
 
+                  {/* password */}
+                  {
+                    editingUser ? <div></div> : <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Mật khẩu"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                  </div>
+                  }
+                  
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <input
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  placeholder="Tên đầy đủ"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="user@example.com"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                <input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+84 123 456 789"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="w-full h-10 px-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#ff6600]"
+                >
+                  <option value="CUSTOMER">Customer</option>
+                  <option value="STAFF">Staff</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                                  {isLoading ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                      <span>Saving...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="w-4 h-4" />
+                                      <span>{editingUser ? 'Update' : 'Create'}</span>
+                                    </>
+                                  )}
+                                </button>
+                </form>
+
+              </div>
+            </div>
+          )
+        }
       </div>
     </div>
   )

@@ -9,10 +9,15 @@ import api from '../../../shared/services/api';
  * @returns {Promise<Object>}
  * */
 export const getAllUsers = async (page, size) => {
+  try {
   const response = await api.get("/users/", {
     params: { page: page, size: size, sort: "createdAt,desc" },
     })
   return response.data.content || []
+  } catch (error) {
+    console.error("Problem with Get All: ", error)
+    throw error
+  }
 }
 
 /**
@@ -24,8 +29,13 @@ export const getAllUsers = async (page, size) => {
  * @returns {Promise<Object>} A Promise resolving to the user data returned from the API.
  */
 export const getUserById = async (id) => {
+  try {
   const response = await api.get(`/users/${id}`)
   return response.data
+  } catch (error) {
+    console.error("Problem with Get By Id: ", error)
+    throw error
+  }
 }
 
 /**
@@ -42,6 +52,7 @@ export const getUserById = async (id) => {
  * @returns {Promise<Object>} A Promise resolving to the created user’s data.
  */
 export const createUser = async (userData) => {
+  try {
   const response = await api.post("users/create", {
       username: userData.username,
       password: userData.password,     
@@ -51,6 +62,10 @@ export const createUser = async (userData) => {
     }
   );
   return response.data
+  } catch (error) {
+    console.error("Problem with Create: ", error)
+    throw error
+  }
 }
 
 /**
@@ -63,8 +78,13 @@ export const createUser = async (userData) => {
  * @returns {Promise<Object>} A Promise resolving to the updated user data.
  */
 export const updateUser = async (id, data) => {
+  try {
   const response = await api.put(`/users/${id}`, data)
   return response.data
+  } catch (error) {
+    console.error("Problem with Update: ", error)
+    throw error
+  }
 }
 
 /**
@@ -77,8 +97,14 @@ export const updateUser = async (id, data) => {
  * @returns {Promise<Object>} A Promise resolving to the updated user data.
  */
 export const patchUser = async (id, updates) => {
-  const response = await api.patch(`/users/${id}`, updates)
-  return response.data
+  try {
+    const response = await api.patch(`/users/${id}`, updates)
+    return response.data
+  } catch (error) {
+    console.error("Problem with Patch: ", error)
+    throw error
+  }
+  
 }
 
 /**
@@ -90,8 +116,13 @@ export const patchUser = async (id, updates) => {
  * @returns {Promise<Object>} A Promise resolving to the server’s response data after deletion.
  */
 export const deleteUser = async (id) => {
+  try {
   const response = await api.delete(`/users/${id}`)
   return response.data
+  } catch (error) {
+    console.error("Problem with Delete: ", error)
+    throw error
+  }
 }
 
 export default {
