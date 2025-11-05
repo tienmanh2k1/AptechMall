@@ -38,7 +38,7 @@ public class User implements UserDetails {
     @Column(name="user_id")
     private Long Id;
 
-    @Column(nullable = false, unique = true, length = 30)
+    @Column(unique = true, length = 30)
     private String username;
 
     @Column(nullable = false, unique = true, length = 100)

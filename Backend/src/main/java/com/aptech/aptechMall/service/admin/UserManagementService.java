@@ -5,22 +5,22 @@ import com.aptech.aptechMall.dto.user.UserResponseDTO;
 import com.aptech.aptechMall.dto.user.UserUpdateDTO;
 import com.aptech.aptechMall.model.jpa.User;
 import com.aptech.aptechMall.repository.UserRepository;
+import com.aptech.aptechMall.security.AuthenticationUtil;
 import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.Status;
 import com.aptech.aptechMall.security.requests.RegisterRequest;
 import com.aptech.aptechMall.security.requests.RegisterResponse;
 import jakarta.transaction.Transactional;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +58,8 @@ public class UserManagementService {
 
     @Transactional
     public UserResponseDTO patchUser(Long id, Map<String, Object> updates) {
+        User currentUser = AuthenticationUtil.getCurrentUser();
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -71,8 +73,12 @@ public class UserManagementService {
             }
         });
 
-        userRepository.save(user);
-        return toDTO(user);
+        if (currentUser.getEmail().equals(user.getEmail()) && !currentUser.getStatus().equals(user.getStatus())) {
+            throw new IllegalStateException("You cannot ban/restore your own account");
+        } else {
+            userRepository.save(user);
+            return toDTO(user);
+        }
     }
 
     public UserResponseDTO updateUser(Long id, UserUpdateDTO dto) {
@@ -83,7 +89,6 @@ public class UserManagementService {
                     if (dto.getAvatarUrl() != null) existingUser.setAvatarUrl(dto.getAvatarUrl());
                     if (dto.getPhone() != null) existingUser.setPhone(dto.getPhone());
                     if (dto.getRole() != null) existingUser.setRole(dto.getRole());
-                    if (dto.getStatus() != null) existingUser.setStatus(dto.getStatus());
                     User updated = userRepository.save(existingUser);
                     return toDTO(updated);
                 })
@@ -91,9 +96,16 @@ public class UserManagementService {
     }
 
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found with id: " + id);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = auth.getName();
+
+        User user = userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+
+        if (user.getUsername().equals(currentUsername)) {
+            throw new IllegalStateException("You cannot delete your own account");
         }
+
+        user.setStatus(Status.DELETED);
         userRepository.deleteById(id);
     }
 
