@@ -53,6 +53,7 @@ public class AuthService {
                     .phone(user.getPhone())
                     .avatarUrl(user.getAvatarUrl())
                     .fullName(user.getFullName())
+                    .role(user.getRole())
                     .registeredAt(user.getRegisteredAt())
                     .lastLogin(user.getLastLogin())
                     .build();
@@ -102,6 +103,7 @@ public class AuthService {
                     .phone(user.getPhone())
                     .avatarUrl(user.getAvatarUrl())
                     .fullName(user.getFullName())
+                    .role(user.getRole())
                     .registeredAt(user.getRegisteredAt())
                     .lastLogin(user.getLastLogin())
                     .build();

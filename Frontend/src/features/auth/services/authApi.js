@@ -86,7 +86,14 @@ export const getCurrentUser = async () => {
     return response.data;
   } catch (error) {
     console.error('Get current user error:', error);
-    throw error;
+    // Fallback to /auth/profile if /auth/me doesn't work
+    try {
+      const response = await api.get('/auth/profile');
+      return response.data;
+    } catch (fallbackError) {
+      console.error('Get current user fallback error:', fallbackError);
+      throw fallbackError;
+    }
   }
 };
 

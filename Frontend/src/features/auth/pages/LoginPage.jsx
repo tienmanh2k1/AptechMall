@@ -5,7 +5,7 @@ import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../../cart/context/CartContext';
-import { login as loginApi } from '../services';
+import { login as loginApi, getCurrentUser } from '../services';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -104,12 +104,18 @@ const LoginPage = () => {
         throw new Error('No token received from server');
       }
 
-      // Decode user info from token or fetch from /auth/me endpoint
-      // For now, create a basic user object
-      const user = {
+      // Fetch full user profile to get role and other details
+      let user = {
         username: formData.username,
-        // You can fetch full user details with getCurrentUser() if needed
       };
+      
+      try {
+        const userProfile = await getCurrentUser();
+        user = userProfile;
+      } catch (error) {
+        console.warn('Could not fetch user profile, using basic info:', error);
+        // Continue with basic user info if profile fetch fails
+      }
 
       // Save to context and localStorage
       login(token, user);

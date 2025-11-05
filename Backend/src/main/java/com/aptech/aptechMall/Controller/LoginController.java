@@ -59,6 +59,11 @@ public class LoginController {
         return ResponseEntity.ok(authService.getProfile(request, response));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ProfileResponse> getCurrentUser(HttpServletRequest request, HttpServletResponse response){
+        return ResponseEntity.ok(authService.getProfile(request, response));
+    }
+
     @PostMapping("/profile")
     public ResponseEntity<ProfileResponse> updateProfile(HttpServletRequest request, HttpServletResponse response, @RequestBody UpdateProfile info,
                                                          @RequestPart(value = "avatar", required = false) MultipartFile avatar){
@@ -79,15 +84,22 @@ public class LoginController {
         RegisterRequest request3 = new RegisterRequest("VanC", "123456", "Nguyen Van C", "CUSTOMER", "NguyenVanC@gmail.com");
         RegisterRequest request4 = new RegisterRequest(null, "demo123", "Demo User", "CUSTOMER", "demo.account@gmail.com");
         RegisterRequest request5 = new RegisterRequest(null, "admin123", "Demo Admin", "ADMIN", "admin@pandamall.com");
+        // Admin user with username "admin" and password "123456@"
+        RegisterRequest adminRequest = new RegisterRequest("admin", "123456@", "Admin User", "ADMIN", "admin@aptechmall.com");
 
         preRegistrations.add(request1);
         preRegistrations.add(request2);
         preRegistrations.add(request3);
         preRegistrations.add(request4);
         preRegistrations.add(request5);
+        preRegistrations.add(adminRequest);
 
         for(RegisterRequest request : preRegistrations){
-            if (!authService.verifyEmailExists(request.getEmail())){
+            // Check if user already exists by email or username
+            boolean emailExists = authService.verifyEmailExists(request.getEmail());
+            boolean usernameExists = request.getUsername() != null && authService.verifyUserExists(request.getUsername());
+            
+            if (!emailExists && !usernameExists){
                 authService.preRegister(request);
             }
         }

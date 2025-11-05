@@ -15,6 +15,8 @@ import CheckoutSuccessPage from './features/order/pages/CheckoutSuccessPage';
 import OrderListPage from './features/order/pages/OrderListPage';
 import OrderDetailPage from './features/order/pages/OrderDetailPage';
 import CartDebugPage from './features/cart/pages/CartDebugPage';
+import AdminRoute from './features/admin/components/AdminRoute';
+import AdminShopManagementPage from './features/admin/pages/AdminShopManagementPage';
 
 const HomePage = () => (
   <div className="container mx-auto px-4 py-16 text-center">
@@ -114,6 +116,16 @@ function App() {
                   <ProtectedRoute>
                     <CartDebugPage />
                   </ProtectedRoute>
+                }
+              />
+
+              {/* Admin routes - Require admin role */}
+              <Route
+                path="/admin/shops"
+                element={
+                  <AdminRoute>
+                    <AdminShopManagementPage />
+                  </AdminRoute>
                 }
               />
 
