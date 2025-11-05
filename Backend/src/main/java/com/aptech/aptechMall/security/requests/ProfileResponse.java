@@ -1,5 +1,6 @@
 package com.aptech.aptechMall.security.requests;
 
+import com.aptech.aptechMall.security.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,6 +19,7 @@ public class ProfileResponse {
     private String avatarUrl;
     private boolean emailVerified;
     private String phone;
+    private Role role;
     private LocalDateTime registeredAt;
     private LocalDateTime lastLogin;
 }

@@ -69,6 +69,11 @@ public class LoginController {
         return ResponseEntity.ok(authService.getProfile(request, response));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ProfileResponse> getCurrentUser(HttpServletRequest request, HttpServletResponse response){
+        return ResponseEntity.ok(authService.getProfile(request, response));
+    }
+
     @PostMapping("/profile")
     public ResponseEntity<ProfileResponse> updateProfile(
             HttpServletRequest request,
@@ -79,7 +84,6 @@ public class LoginController {
                 authService.updateProfile(request, response, info)
         );
     }
-
 
     @PostMapping("/update-credentials")
     public ResponseEntity<String> updateAccountCredentials(HttpServletRequest request, HttpServletResponse response, @Valid @RequestBody UpdateCredential credentials){
@@ -93,8 +97,10 @@ public class LoginController {
         RegisterRequest request1 = new RegisterRequest("VanA", "123456", "Nguyen Van A", "ADMIN", "NguyenVanA@gmail.com");
         RegisterRequest request2 = new RegisterRequest("VanB", "123456", "Nguyen Van B", "STAFF", "NguyenVanB@gmail.com");
         RegisterRequest request3 = new RegisterRequest("VanC", "123456", "Nguyen Van C", "CUSTOMER", "NguyenVanC@gmail.com");
-        RegisterRequest request4 = new RegisterRequest("Demo", "demo123", "Demo User", "CUSTOMER", "demo.account@gmail.com");
-        RegisterRequest request5 = new RegisterRequest("Admin", "admin123", "Demo Admin", "ADMIN", "admin@pandamall.com");
+        RegisterRequest request4 = new RegisterRequest(null, "demo123", "Demo User", "CUSTOMER", "demo.account@gmail.com");
+        RegisterRequest request5 = new RegisterRequest(null, "admin123", "Demo Admin", "ADMIN", "admin@pandamall.com");
+        // Admin user with username "admin" and password "123456@"
+        RegisterRequest adminRequest = new RegisterRequest("admin", "123456@", "Admin User", "ADMIN", "admin@aptechmall.com");
 
         preRegistrations.add(request1);
         preRegistrations.add(request2);
