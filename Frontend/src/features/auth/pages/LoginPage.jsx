@@ -5,7 +5,7 @@ import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../../cart/context/CartContext';
-import { login as loginApi, googleOauth, getCurrentUser } from '../services';
+import { login as loginApi, googleOauth, getCurrentUser, generateRefreshOauth } from '../services';
 import { GoogleLogin } from '@react-oauth/google';
 
 const LoginPage = () => {
@@ -87,7 +87,7 @@ const LoginPage = () => {
     const username = formData.username.length === 0 ? authRequest.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_") : formData.username;
     const response = await googleOauth(authRequest, username);
 
-    if (response.status === 200){
+    // if (response.status === 200){
       const token = response.token;
       if (!token) {
         throw new Error('No token received from server');
@@ -96,14 +96,16 @@ const LoginPage = () => {
         username: username,
       };
 
+      generateRefreshOauth();
+
       login(token, user);
 
       console.log('🛒 [LoginPage] Refreshing cart after successful login');
       refreshCart();
-
+      setLoading(false);
       toast.success('Login successful!');
-      navigate("/");
-    }
+      navigate("/", { replace: true });
+    // }
 
     } catch (error){
       setLoading(false);

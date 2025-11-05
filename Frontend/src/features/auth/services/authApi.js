@@ -32,8 +32,8 @@ export const login = async (credentials) => {
  * Login user
  * @param {Object} authRequest
  * @param {string} authRequest.email - Google email
- * @param {string} authRequest.name - Google Full Name
- * @param {string} authRequest.sub - Google Id
+ * @param {string} authRequest.fullName - Google Full Name
+ * @param {string} authRequest.googleSub - Google Id
  * @param {string} username - Either from form's username or Username from Email
  * @returns {Promise<Object>} Response with token
  */
@@ -133,6 +133,21 @@ export const refreshToken = async () => {
   try {
     // Changed backend to only use Redis for Refresh Token management
     const response = await api.post('/auth/refresh');
+    return response.data;
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate Refresh Token for Oauth Users
+ * @returns {Promise<Object>} New access token
+ */
+export const generateRefreshOauth = async () => {
+  try {
+    // Changed backend to only use Redis for Refresh Token management
+    const response = await api.post('/auth/oauth');
     return response.data;
   } catch (error) {
     console.error('Refresh token error:', error);

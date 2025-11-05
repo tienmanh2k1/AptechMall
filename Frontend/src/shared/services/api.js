@@ -7,6 +7,7 @@ const api = axios.create({
   timeout: 100000,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': true
   },
   withCredentials: true, // Enable cookies for refresh_token
 });
