@@ -17,6 +17,7 @@ import OrderDetailPage from './features/order/pages/OrderDetailPage';
 import CartDebugPage from './features/cart/pages/CartDebugPage';
 import AdminRoute from './features/admin/components/AdminRoute';
 import AdminShopManagementPage from './features/admin/pages/AdminShopManagementPage';
+import AdminUserManagementPage from './features/admin/pages/AdminUserManagementPage';
 
 const HomePage = () => (
   <div className="container mx-auto px-4 py-16 text-center">
@@ -125,6 +126,15 @@ function App() {
                 element={
                   <AdminRoute>
                     <AdminShopManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/users"
+                element={
+                  <AdminRoute>
+                    <AdminUserManagementPage />
                   </AdminRoute>
                 }
               />

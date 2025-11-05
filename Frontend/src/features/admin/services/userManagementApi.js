@@ -12,7 +12,7 @@ export const getAllUsers = async (page, size) => {
   const response = await api.get("/users/", {
     params: { page: page, size: size, sort: "createdAt,desc" },
     })
-  return response.data
+  return response.data.content || []
 }
 
 /**
