@@ -1,14 +1,19 @@
 package com.aptech.aptechMall.service.admin;
 
+import com.aptech.aptechMall.Exception.UsernameAlreadyTaken;
 import com.aptech.aptechMall.dto.user.UserResponseDTO;
 import com.aptech.aptechMall.dto.user.UserUpdateDTO;
 import com.aptech.aptechMall.model.jpa.User;
 import com.aptech.aptechMall.repository.UserRepository;
 import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.Status;
+import com.aptech.aptechMall.security.requests.RegisterRequest;
+import com.aptech.aptechMall.security.requests.RegisterResponse;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 
@@ -22,6 +27,7 @@ import java.util.stream.Collectors;
 public class UserManagementService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     private UserResponseDTO toDTO(User user) {
         UserResponseDTO dto = new UserResponseDTO();
@@ -89,5 +95,25 @@ public class UserManagementService {
             throw new RuntimeException("User not found with id: " + id);
         }
         userRepository.deleteById(id);
+    }
+
+    public RegisterResponse create(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new UsernameAlreadyTaken("Username " +request.getUsername() + " already taken");
+        }
+
+        Role role = Role.fromString(request.getRole());
+
+        User user = User.builder()
+                .username(request.getUsername())
+                .fullName(request.getFullName())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(role)
+                .email(request.getEmail())
+                .build();
+
+        userRepository.save(user);
+
+        return new RegisterResponse("Successfully registered the user " + user.getUsername());
     }
 }

@@ -261,9 +261,8 @@ public class AuthService {
                     user.setLastLogin(LocalDateTime.now());
                     userRepository.save(user);
                     log.info("Google Auth successfully authenticated for " + request.getEmail());
-                    return new AuthResponse(accessJwt);
-                }
-                return null;
+                } else accessJwt = "";
+                return new AuthResponse(accessJwt);
             }
             default -> throw new AccountNotActiveException("Account is not active or does not have a valid status identifiers. Please contact support.");
         }

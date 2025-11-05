@@ -54,6 +54,16 @@ public class LoginController {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Refresh Token");
     }
 
+    @PostMapping("/oauth")
+    public ResponseEntity<String> oAuthToken(HttpServletRequest request, HttpServletResponse response){
+        try {
+            authService.generateRefreshTokenCookie(request, response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Oauth failed to generate refresh");
+        }
+        return ResponseEntity.ok("Oauth Refresh initiated successfully");
+    }
+
     @GetMapping("/profile")
     public ResponseEntity<ProfileResponse> getProfile(HttpServletRequest request, HttpServletResponse response){
         return ResponseEntity.ok(authService.getProfile(request, response));

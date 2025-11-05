@@ -2,7 +2,10 @@ package com.aptech.aptechMall.Controller;
 
 import com.aptech.aptechMall.dto.user.UserResponseDTO;
 import com.aptech.aptechMall.dto.user.UserUpdateDTO;
+import com.aptech.aptechMall.security.requests.RegisterRequest;
+import com.aptech.aptechMall.security.requests.RegisterResponse;
 import com.aptech.aptechMall.service.admin.UserManagementService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +24,12 @@ import java.util.Map;
 public class UsersDataController {
 
     private final UserManagementService service;
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/create")
+    public ResponseEntity<RegisterResponse> createUser(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.ok(service.create(request));
+    }
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
     @GetMapping("/")
