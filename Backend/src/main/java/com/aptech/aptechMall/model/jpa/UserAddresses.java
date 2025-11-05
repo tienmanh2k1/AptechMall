@@ -11,8 +11,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * UserAddresses entity representing saved addresses for users
+ * Many-to-One relationship with User
+ */
 @Entity
-@Table(name = "user_addresses")
+@Table(name = "user_addresses",
+       indexes = {
+           @Index(name = "idx_address_user_id", columnList = "user_id"),
+           @Index(name = "idx_address_is_default", columnList = "is_default")
+       })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -66,5 +74,28 @@ public class UserAddresses {
         if (this.addressType == null) {
             this.addressType = AddressType.HOME;
         }
+    }
+
+    /**
+     * Get full address string
+     * @return Formatted full address
+     */
+    public String getFullAddress() {
+        return String.format("%s, %s, %s, %s, %s",
+                addressDetail, ward, district, province, "Vietnam");
+    }
+
+    /**
+     * Set as default address
+     */
+    public void setAsDefault() {
+        this.isDefault = true;
+    }
+
+    /**
+     * Unset as default address
+     */
+    public void unsetDefault() {
+        this.isDefault = false;
     }
 }

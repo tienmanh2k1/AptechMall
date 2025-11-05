@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/*", "/api/auth/**", "/api/debug/**", "/api/aliexpress/**", "/api/1688/**", "/api/products/**", "/api/exchange-rates/**").permitAll()
                         .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "STAFF")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/wallet/*/lock", "/api/wallet/*/unlock").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .logout(AbstractHttpConfigurer::disable)
