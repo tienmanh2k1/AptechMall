@@ -70,6 +70,19 @@ public class User implements UserDetails {
     private Set<UserAddresses> userAddresses = new HashSet<>();
 
     @Override
+    public String getUsername() {
+        // Return email if username is null (for email-only users)
+        if (username != null) {
+            return username;
+        }
+        if (email != null) {
+            return email;
+        }
+        // Should never happen due to database constraints, but handle safely
+        throw new IllegalStateException("User must have either username or email");
+    }
+
+    @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }

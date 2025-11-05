@@ -40,10 +40,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/*", "/api/auth/**", "/api/debug/**", "/api/aliexpress/**", "/api/1688/**", "/api/products/**", "/api/exchange-rates/**").permitAll()
+                        .requestMatchers("/api/auth/*", "/api/auth/**", "/api/debug/**", "/api/aliexpress/**", "/api/1688/**", "/api/products/**", "/api/exchange-rates/**", "/api/bank-transfer/**").permitAll()
                         .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "STAFF")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/wallet/*/lock", "/api/wallet/*/unlock").hasRole("ADMIN")
+                        .requestMatchers("/api/wallet/**").authenticated()
+                        .requestMatchers("/api/cart/**", "/api/orders/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .logout(AbstractHttpConfigurer::disable)

@@ -24,4 +24,11 @@ public class WalletResponse {
     private boolean isLocked;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    /**
+     * Deposit code for bank transfer
+     * Format: Username (if exists) or USER{userId}
+     * No special characters - safe for bank transfer notes
+     */
+    private String depositCode;
 }

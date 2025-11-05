@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Package, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { ShoppingCart, User, Search, Package, LogOut, LogIn, UserPlus, Wallet } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useCart } from '../../features/cart/context/CartContext';
 import { useAuth } from '../../features/auth/context/AuthContext';
@@ -45,6 +45,12 @@ const Header = () => {
               <Search className="w-5 h-5" />
               <span>Search</span>
             </Link>
+            {isAuthenticated() && (
+              <Link to="/wallet" className="text-gray-700 hover:text-red-600 flex items-center gap-2">
+                <Wallet className="w-5 h-5" />
+                <span>Wallet</span>
+              </Link>
+            )}
             <Link to="/orders" className="text-gray-700 hover:text-red-600 flex items-center gap-2">
               <Package className="w-5 h-5" />
               <span>Orders</span>
@@ -82,6 +88,14 @@ const Header = () => {
                       <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
+                    <Link
+                      to="/wallet"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <Wallet className="w-4 h-4" />
+                      My Wallet
+                    </Link>
                     <Link
                       to="/orders"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"

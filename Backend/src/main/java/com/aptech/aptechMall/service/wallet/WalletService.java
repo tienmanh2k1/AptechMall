@@ -63,6 +63,9 @@ public class WalletService {
     public WalletResponse getWallet(Long userId) {
         UserWallet wallet = getOrCreateWallet(userId);
 
+        // Generate deposit code (username or USER{id})
+        String depositCode = generateDepositCode(wallet.getUser());
+
         return WalletResponse.builder()
                 .walletId(wallet.getId())
                 .userId(userId)
@@ -70,7 +73,29 @@ public class WalletService {
                 .isLocked(wallet.isLocked())
                 .createdAt(wallet.getCreatedAt())
                 .updatedAt(wallet.getUpdatedAt())
+                .depositCode(depositCode)
                 .build();
+    }
+
+    /**
+     * Generate deposit code for bank transfer
+     * Format: Username (uppercase, no special chars) or USER{userId}
+     * @param user User entity
+     * @return Deposit code safe for bank transfer
+     */
+    private String generateDepositCode(User user) {
+        // If user has username, use it (uppercase, alphanumeric only)
+        if (user.getUsername() != null && !user.getUsername().isEmpty()) {
+            String username = user.getUsername()
+                    .toUpperCase()
+                    .replaceAll("[^A-Z0-9]", ""); // Remove non-alphanumeric chars
+            if (!username.isEmpty()) {
+                return username;
+            }
+        }
+
+        // Fallback: USER{userId}
+        return "USER" + user.getUserId();
     }
 
     /**
