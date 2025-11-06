@@ -2,6 +2,7 @@ package com.aptech.aptechMall.Controller;
 
 import com.aptech.aptechMall.dto.ApiResponse;
 import com.aptech.aptechMall.dto.order.OrderResponse;
+import com.aptech.aptechMall.dto.order.UpdateOrderFeesRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderStatusRequest;
 import com.aptech.aptechMall.entity.OrderStatus;
 import com.aptech.aptechMall.service.OrderService;
@@ -18,13 +19,13 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * REST Controller for admin order management
- * All endpoints require ADMIN role
+ * All endpoints require ADMIN or STAFF role
  * Base path: /api/admin/orders
  */
 @RestController
 @RequestMapping("/api/admin/orders")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 @Slf4j
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:4200"})
 public class AdminOrderController {
@@ -99,6 +100,29 @@ public class AdminOrderController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(order, "Order status updated successfully")
+        );
+    }
+
+    /**
+     * Update order fees (admin/staff operation)
+     * PUT /api/admin/orders/{orderId}/fees
+     *
+     * @param orderId Order ID
+     * @param request UpdateOrderFeesRequest (shipping fees, weight, additional services)
+     * @return Updated OrderResponse
+     */
+    @PutMapping("/{orderId}/fees")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrderFees(
+            @PathVariable Long orderId,
+            @Valid @RequestBody UpdateOrderFeesRequest request) {
+
+        log.info("PUT /api/admin/orders/{}/fees - domesticShipping: {}, internationalShipping: {}, weight: {}",
+                orderId, request.getDomesticShippingFee(), request.getInternationalShippingFee(), request.getEstimatedWeight());
+
+        OrderResponse order = orderService.updateOrderFees(orderId, request);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(order, "Order fees updated successfully")
         );
     }
 }

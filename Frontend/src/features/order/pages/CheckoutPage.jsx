@@ -169,8 +169,15 @@ const CheckoutPage = () => {
     }
   }
 
-  // Calculate 70% deposit
-  const depositVND = totalVND * 0.70;
+  // Calculate service fee (1.5% of product cost)
+  const serviceFeeVND = totalVND * 0.015;
+
+  // Calculate total with service fee
+  const totalWithServiceFee = totalVND + serviceFeeVND;
+
+  // Calculate 70% deposit on (product + service fee)
+  const depositVND = totalWithServiceFee * 0.70;
+  const remainingVND = totalWithServiceFee * 0.30;
 
   const totalItems = cart.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
@@ -289,33 +296,73 @@ const CheckoutPage = () => {
 
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-gray-600">
-                <span>Total Items:</span>
-                <span className="font-medium text-gray-900">{totalItems}</span>
+                <span>Sản phẩm:</span>
+                <span className="font-medium text-gray-900">{totalItems} mặt hàng</span>
               </div>
 
-              <div className="pt-3 border-t border-gray-200 space-y-2">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-gray-600">Product Total:</span>
-                  <span className="text-lg font-medium text-gray-900">
-                    {exchangeRates ? formatCurrency(totalVND, 'VND') : 'Loading...'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-baseline pt-2 border-t border-gray-100">
-                  <div>
-                    <div className="text-sm font-medium text-blue-600">Deposit Now (70%)</div>
-                    <div className="text-xs text-gray-500">Pay from wallet</div>
+              <div className="pt-3 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-3">Tổng dự kiến:</p>
+                <div className="space-y-2 text-sm">
+                  {/* 1. Tiền hàng */}
+                  <div className="flex justify-between text-gray-600">
+                    <span>1. Tiền hàng:</span>
+                    <span className="font-medium">
+                      {exchangeRates ? formatCurrency(totalVND, 'VND') : 'Loading...'}
+                    </span>
                   </div>
-                  <span className="text-xl font-bold text-blue-600">
-                    {exchangeRates ? formatCurrency(depositVND, 'VND') : 'Loading...'}
-                  </span>
-                </div>
 
-                <div className="flex justify-between items-baseline text-sm pb-2">
-                  <span className="text-gray-500">Remaining (30%)</span>
-                  <span className="text-gray-600">
-                    {exchangeRates ? formatCurrency(totalVND - depositVND, 'VND') : 'Loading...'}
-                  </span>
+                  {/* 2. Phí mua hàng */}
+                  <div className="flex justify-between text-gray-600">
+                    <span>2. Phí mua hàng (1.5%):</span>
+                    <span className="font-medium">
+                      {exchangeRates ? formatCurrency(serviceFeeVND, 'VND') : 'Loading...'}
+                    </span>
+                  </div>
+
+                  {/* 3. Phí vận chuyển nội địa TQ */}
+                  <div className="flex justify-between text-gray-600">
+                    <span>3. Phí vận chuyển nội địa TQ:</span>
+                    <span className="text-gray-400 italic text-xs">cập nhật</span>
+                  </div>
+
+                  {/* 4. Phí vận chuyển quốc tế */}
+                  <div className="flex justify-between text-gray-600">
+                    <span>4. Phí vận chuyển quốc tế TQ - VN:</span>
+                    <span className="text-gray-400 italic text-xs">cập nhật</span>
+                  </div>
+
+                  {/* 5. Phí dịch vụ bổ sung */}
+                  <div className="flex justify-between text-gray-600">
+                    <span>5. Phí dịch vụ:</span>
+                    <span className="text-gray-400 italic text-xs">cập nhật</span>
+                  </div>
+
+                  {/* Total line */}
+                  <div className="flex justify-between text-gray-900 font-semibold pt-2 border-t border-gray-200">
+                    <span>Tiền hàng + phí mua hàng:</span>
+                    <span className="text-base">
+                      {exchangeRates ? formatCurrency(totalWithServiceFee, 'VND') : 'Loading...'}
+                    </span>
+                  </div>
+
+                  {/* Deposit */}
+                  <div className="flex justify-between items-baseline pt-2 border-t border-gray-100">
+                    <div>
+                      <div className="text-sm font-medium text-blue-600">Tiền cọc (70%)</div>
+                      <div className="text-xs text-gray-500">Thanh toán ngay từ ví</div>
+                    </div>
+                    <span className="text-xl font-bold text-blue-600">
+                      {exchangeRates ? formatCurrency(depositVND, 'VND') : 'Loading...'}
+                    </span>
+                  </div>
+
+                  {/* Remaining */}
+                  <div className="flex justify-between items-baseline text-sm">
+                    <span className="text-gray-500">Còn lại (30% + phí):</span>
+                    <span className="text-gray-600 font-medium">
+                      {exchangeRates ? formatCurrency(remainingVND, 'VND') : 'Loading...'}
+                    </span>
+                  </div>
                 </div>
               </div>
 

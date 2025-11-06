@@ -4,6 +4,7 @@ import com.aptech.aptechMall.Exception.*;
 import com.aptech.aptechMall.dto.exchange.ExchangeRateResponse;
 import com.aptech.aptechMall.dto.order.CheckoutRequest;
 import com.aptech.aptechMall.dto.order.OrderResponse;
+import com.aptech.aptechMall.dto.order.UpdateOrderFeesRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderStatusRequest;
 import com.aptech.aptechMall.entity.*;
 import com.aptech.aptechMall.repository.CartItemRepository;
@@ -43,6 +44,7 @@ public class OrderService {
     private final ExchangeRateService exchangeRateService;
     private final WalletTransactionRepository walletTransactionRepository;
     private final UserWalletRepository userWalletRepository;
+    private final FeeCalculationService feeCalculationService;
 
     /**
      * Infer currency from marketplace
@@ -179,20 +181,27 @@ public class OrderService {
         // Set product cost in VND
         order.setProductCost(totalVND);
 
-        // Calculate deposit (70% of product cost)
-        BigDecimal depositAmount = totalVND.multiply(BigDecimal.valueOf(0.70))
+        // Calculate service fee (1.5% of product cost) - using FeeCalculationService
+        BigDecimal serviceFee = feeCalculationService.calculateServiceFee(totalVND);
+        order.setServiceFee(serviceFee);
+
+        // Total cost = product cost + service fee
+        BigDecimal totalCost = totalVND.add(serviceFee);
+
+        // Calculate deposit (70% of total cost including service fee)
+        BigDecimal depositAmount = totalCost.multiply(BigDecimal.valueOf(0.70))
                 .setScale(0, java.math.RoundingMode.HALF_UP);
         order.setDepositAmount(depositAmount);
 
-        // Calculate remaining (30% of product cost)
-        BigDecimal remainingAmount = totalVND.subtract(depositAmount);
+        // Calculate remaining (30% of total cost)
+        BigDecimal remainingAmount = totalCost.subtract(depositAmount);
         order.setRemainingAmount(remainingAmount);
 
         // Set totalAmount (for wallet payment, this is same as deposit for now)
         order.setTotalAmount(depositAmount);
 
-        log.info("Order amounts - Product: {} VND, Deposit: {} VND, Remaining: {} VND",
-                totalVND, depositAmount, remainingAmount);
+        log.info("Order amounts - Product: {} VND, Service Fee: {} VND (1.5%), Total Cost: {} VND, Deposit: {} VND, Remaining: {} VND",
+                totalVND, serviceFee, totalCost, depositAmount, remainingAmount);
 
         // Get wallet and check balance
         UserWallet wallet = walletService.getOrCreateWallet(userId);
@@ -597,5 +606,90 @@ public class OrderService {
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         return OrderResponse.fromEntity(orderWithItems);
+    }
+
+    /**
+     * Update order fees (admin/staff operation)
+     * Updates shipping fees and calculates additional services fees
+     * @param orderId Order ID
+     * @param request UpdateOrderFeesRequest
+     * @return Updated OrderResponse
+     */
+    public OrderResponse updateOrderFees(Long orderId, UpdateOrderFeesRequest request) {
+        log.info("Admin/staff updating order {} fees", orderId);
+
+        Order order = orderRepository.findByIdWithItems(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        // Update domestic shipping fee (from China warehouse to port)
+        if (request.getDomesticShippingFee() != null) {
+            // Convert CNY to VND
+            BigDecimal domesticFeeVND = exchangeRateService.convertCurrency(
+                    request.getDomesticShippingFee(),
+                    "CNY",
+                    "VND"
+            );
+            order.setDomesticShippingFee(domesticFeeVND);
+            log.info("Updated domestic shipping fee: {} CNY = {} VND",
+                    request.getDomesticShippingFee(), domesticFeeVND);
+        }
+
+        // Update international shipping fee (China to Vietnam)
+        if (request.getInternationalShippingFee() != null) {
+            order.setInternationalShippingFee(request.getInternationalShippingFee());
+            log.info("Updated international shipping fee: {} VND", request.getInternationalShippingFee());
+        }
+
+        // Update estimated weight
+        if (request.getEstimatedWeight() != null) {
+            order.setEstimatedWeight(request.getEstimatedWeight());
+            log.info("Updated estimated weight: {} kg", request.getEstimatedWeight());
+        }
+
+        // Calculate additional services fees
+        BigDecimal additionalServicesFee = feeCalculationService.calculateTotalAdditionalServicesFee(
+                order.getItems(),
+                request.getEstimatedWeight() != null ? request.getEstimatedWeight() : BigDecimal.ZERO,
+                request.getIncludeWoodenPackaging() != null && request.getIncludeWoodenPackaging(),
+                request.getIncludeBubbleWrap() != null && request.getIncludeBubbleWrap(),
+                request.getIncludeItemCountCheck() != null && request.getIncludeItemCountCheck()
+        );
+
+        // Store additional services fee in order
+        order.setAdditionalServicesFee(additionalServicesFee);
+        log.info("Additional services fee: {} VND", additionalServicesFee);
+
+        // Update note if provided
+        if (request.getNote() != null && !request.getNote().isEmpty()) {
+            String currentNote = order.getNote() != null ? order.getNote() : "";
+            order.setNote(currentNote + "\n[Admin/Staff Note] " + request.getNote());
+        }
+
+        // Recalculate total amount
+        BigDecimal productCost = order.getProductCost() != null ? order.getProductCost() : BigDecimal.ZERO;
+        BigDecimal serviceFee = order.getServiceFee() != null ? order.getServiceFee() : BigDecimal.ZERO;
+        BigDecimal domesticShipping = order.getDomesticShippingFee() != null ? order.getDomesticShippingFee() : BigDecimal.ZERO;
+        BigDecimal internationalShipping = order.getInternationalShippingFee() != null ? order.getInternationalShippingFee() : BigDecimal.ZERO;
+
+        BigDecimal totalAmount = productCost
+                .add(serviceFee)
+                .add(domesticShipping)
+                .add(internationalShipping)
+                .add(additionalServicesFee);
+
+        order.setTotalAmount(totalAmount);
+
+        // Recalculate remaining amount (total - deposit already paid)
+        BigDecimal depositAmount = order.getDepositAmount() != null ? order.getDepositAmount() : BigDecimal.ZERO;
+        BigDecimal remainingAmount = totalAmount.subtract(depositAmount);
+        order.setRemainingAmount(remainingAmount);
+
+        log.info("Updated order total: Product={}, Service={}, Domestic={}, International={}, Additional={}, Total={}, Deposit={}, Remaining={}",
+                productCost, serviceFee, domesticShipping, internationalShipping, additionalServicesFee,
+                totalAmount, depositAmount, remainingAmount);
+
+        Order updatedOrder = orderRepository.save(order);
+
+        return OrderResponse.fromEntity(updatedOrder);
     }
 }

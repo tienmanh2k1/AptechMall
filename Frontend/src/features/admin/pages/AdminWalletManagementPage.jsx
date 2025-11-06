@@ -71,7 +71,15 @@ const AdminWalletManagementPage = () => {
       const response = await lockWallet(userId);
       if (response.success) {
         toast.success(`Locked wallet for ${username}`);
-        fetchWallets(); // Refresh the list
+
+        // Update state immediately (optimistic update)
+        setWallets(prevWallets =>
+          prevWallets.map(wallet =>
+            wallet.userId === userId
+              ? { ...wallet, isLocked: true }
+              : wallet
+          )
+        );
       } else {
         toast.error(response.message || 'Failed to lock wallet');
       }
@@ -90,7 +98,15 @@ const AdminWalletManagementPage = () => {
       const response = await unlockWallet(userId);
       if (response.success) {
         toast.success(`Unlocked wallet for ${username}`);
-        fetchWallets(); // Refresh the list
+
+        // Update state immediately (optimistic update)
+        setWallets(prevWallets =>
+          prevWallets.map(wallet =>
+            wallet.userId === userId
+              ? { ...wallet, isLocked: false }
+              : wallet
+          )
+        );
       } else {
         toast.error(response.message || 'Failed to unlock wallet');
       }

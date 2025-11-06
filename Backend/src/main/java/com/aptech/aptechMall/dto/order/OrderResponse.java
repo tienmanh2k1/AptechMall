@@ -44,6 +44,8 @@ public class OrderResponse {
     private BigDecimal serviceFee;
     private BigDecimal domesticShippingFee;
     private BigDecimal internationalShippingFee;
+    private BigDecimal additionalServicesFee; // Phí dịch vụ: đóng gỗ, bọt khí, kiểm đếm
+    private BigDecimal estimatedWeight; // Cân nặng ước tính (kg)
     private BigDecimal vietnamDomesticShippingFee;
     private Boolean isCodShipping;
 
@@ -87,6 +89,8 @@ public class OrderResponse {
                 .serviceFee(order.getServiceFee())
                 .domesticShippingFee(order.getDomesticShippingFee())
                 .internationalShippingFee(order.getInternationalShippingFee())
+                .additionalServicesFee(order.getAdditionalServicesFee())
+                .estimatedWeight(order.getEstimatedWeight())
                 .vietnamDomesticShippingFee(order.getVietnamDomesticShippingFee())
                 .isCodShipping(order.isCodShipping())
                 // Status history

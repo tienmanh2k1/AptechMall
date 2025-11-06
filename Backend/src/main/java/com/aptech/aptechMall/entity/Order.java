@@ -87,6 +87,9 @@ public class Order {
     @Column(name = "international_shipping_fee", precision = 10, scale = 2)
     private BigDecimal internationalShippingFee;
 
+    @Column(name = "additional_services_fee", precision = 10, scale = 2)
+    private BigDecimal additionalServicesFee; // Phí dịch vụ: đóng gỗ, bọt khí, kiểm đếm
+
     @Column(name = "estimated_weight", precision = 8, scale = 2)
     private BigDecimal estimatedWeight; // in kilograms
 
@@ -289,7 +292,7 @@ public class Order {
         BigDecimal serviceFeeAmount = serviceFee != null ? serviceFee : BigDecimal.ZERO;
         BigDecimal domesticFeeAmount = domesticShippingFee != null ? domesticShippingFee : BigDecimal.ZERO;
         BigDecimal intlFeeAmount = internationalShippingFee != null ? internationalShippingFee : BigDecimal.ZERO;
-        BigDecimal additionalFee = getTotalAdditionalServicesFee();
+        BigDecimal additionalFee = additionalServicesFee != null ? additionalServicesFee : BigDecimal.ZERO;
 
         return productRemaining
                 .add(serviceFeeAmount)

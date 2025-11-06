@@ -195,4 +195,42 @@ public class ExchangeRateService {
         updateOrCreateRate(currency.toUpperCase(), rateToVnd, "MANUAL");
         return getRate(currency);
     }
+
+    /**
+     * Convert amount from one currency to another
+     * @param amount Amount to convert
+     * @param fromCurrency Source currency code
+     * @param toCurrency Target currency code
+     * @return Converted amount
+     */
+    public BigDecimal convertCurrency(BigDecimal amount, String fromCurrency, String toCurrency) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        // If same currency, no conversion needed
+        if (fromCurrency.equalsIgnoreCase(toCurrency)) {
+            return amount;
+        }
+
+        // Get exchange rate for source currency to VND
+        ExchangeRateResponse fromRate = getRate(fromCurrency);
+
+        // If target is VND, just multiply by rate
+        if ("VND".equalsIgnoreCase(toCurrency)) {
+            return amount.multiply(fromRate.getRateToVnd())
+                    .setScale(0, RoundingMode.HALF_UP);
+        }
+
+        // If source is VND, divide by target rate
+        if ("VND".equalsIgnoreCase(fromCurrency)) {
+            ExchangeRateResponse toRate = getRate(toCurrency);
+            return amount.divide(toRate.getRateToVnd(), 2, RoundingMode.HALF_UP);
+        }
+
+        // Convert through VND (fromCurrency -> VND -> toCurrency)
+        BigDecimal amountInVND = amount.multiply(fromRate.getRateToVnd());
+        ExchangeRateResponse toRate = getRate(toCurrency);
+        return amountInVND.divide(toRate.getRateToVnd(), 2, RoundingMode.HALF_UP);
+    }
 }

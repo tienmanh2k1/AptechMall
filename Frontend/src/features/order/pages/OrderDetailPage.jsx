@@ -8,11 +8,13 @@ import Loading from '../../../shared/components/Loading';
 import ErrorMessage from '../../../shared/components/ErrorMessage';
 import { formatPrice } from '../../../shared/utils/formatters';
 import { normalizeMarketplace } from '../../../shared/utils/marketplace';
+import { useCurrency } from '../../currency/context/CurrencyContext';
 import { ArrowLeft, MapPin, Phone, FileText, DollarSign, Clock, CreditCard, TrendingUp } from 'lucide-react';
 
 const OrderDetailPage = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { toVND } = useCurrency();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -148,8 +150,21 @@ const OrderDetailPage = () => {
     );
   }
 
-  const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  // Calculate total items
+  const totalItems = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
   const canCancel = order.status === 'PENDING';
+
+  // Calculate total in VND (convert all currencies to VND)
+  const totalVND = order.items?.reduce((sum, item) => {
+    const currency = item.currency || 'VND';
+    const price = item.price || 0;
+    const quantity = item.quantity || 0;
+    const itemTotal = price * quantity;
+
+    // Convert to VND using exchange rates
+    const itemTotalVND = toVND(itemTotal, currency);
+    return sum + (itemTotalVND || 0);
+  }, 0) || order.totalAmount || 0;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -304,37 +319,67 @@ const OrderDetailPage = () => {
                 )}
 
                 {/* Fee Breakdown */}
-                {(order.productCost || order.serviceFee || order.domesticShippingFee || order.internationalShippingFee) && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Fee Breakdown:</p>
-                    <div className="space-y-1 text-sm">
-                      {order.productCost && (
-                        <div className="flex justify-between text-gray-600">
-                          <span>Product Cost:</span>
-                          <span className="font-medium">{formatVND(order.productCost)}</span>
-                        </div>
-                      )}
-                      {order.serviceFee && (
-                        <div className="flex justify-between text-gray-600">
-                          <span>Service Fee:</span>
-                          <span className="font-medium">{formatVND(order.serviceFee)}</span>
-                        </div>
-                      )}
-                      {order.domesticShippingFee && (
-                        <div className="flex justify-between text-gray-600">
-                          <span>Domestic Shipping:</span>
-                          <span className="font-medium">{formatVND(order.domesticShippingFee)}</span>
-                        </div>
-                      )}
-                      {order.internationalShippingFee && (
-                        <div className="flex justify-between text-gray-600">
-                          <span>International Shipping:</span>
-                          <span className="font-medium">{formatVND(order.internationalShippingFee)}</span>
-                        </div>
-                      )}
+                <div className="pt-3 border-t border-gray-200">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Tổng dự kiến chi tiết:</p>
+                  <div className="space-y-2 text-sm">
+                    {/* 1. Tiền hàng */}
+                    <div className="flex justify-between text-gray-600">
+                      <span>1. Tiền hàng:</span>
+                      <span className="font-medium">
+                        {order.productCost ? formatVND(order.productCost) : formatVND(totalVND)}
+                      </span>
+                    </div>
+
+                    {/* 2. Phí mua hàng */}
+                    <div className="flex justify-between text-gray-600">
+                      <span>2. Phí mua hàng (1.5%):</span>
+                      <span className="font-medium">
+                        {order.serviceFee ? formatVND(order.serviceFee) : <span className="text-gray-400 italic">cập nhật</span>}
+                      </span>
+                    </div>
+
+                    {/* 3. Phí vận chuyển nội địa TQ */}
+                    <div className="flex justify-between text-gray-600">
+                      <span>3. Phí vận chuyển nội địa TQ:</span>
+                      <span className="font-medium">
+                        {order.domesticShippingFee ? formatVND(order.domesticShippingFee) : <span className="text-gray-400 italic">cập nhật</span>}
+                      </span>
+                    </div>
+
+                    {/* 4. Phí vận chuyển quốc tế */}
+                    <div className="flex justify-between text-gray-600">
+                      <span>4. Phí vận chuyển quốc tế TQ - VN:</span>
+                      <span className="font-medium">
+                        {order.internationalShippingFee ? formatVND(order.internationalShippingFee) : <span className="text-gray-400 italic">cập nhật</span>}
+                      </span>
+                    </div>
+
+                    {/* 5. Phí dịch vụ bổ sung */}
+                    <div className="flex justify-between text-gray-600">
+                      <span>5. Phí dịch vụ (đóng gỗ, bọt khí, kiểm đếm):</span>
+                      <span className="font-medium">
+                        {order.additionalServicesFee ? formatVND(order.additionalServicesFee) : <span className="text-gray-400 italic">cập nhật</span>}
+                      </span>
+                    </div>
+
+                    {/* Total line */}
+                    <div className="flex justify-between text-gray-900 font-semibold pt-2 border-t border-gray-200">
+                      <span>Tổng thanh toán từ ví:</span>
+                      <span className="text-lg">{formatVND(order.totalAmount)}</span>
+                    </div>
+
+                    {/* Deposit breakdown */}
+                    <div className="flex justify-between text-blue-600 text-xs pt-2">
+                      <span>→ Tiền cọc (70%):</span>
+                      <span className="font-medium">{order.depositAmount ? formatVND(order.depositAmount) : '-'}</span>
+                    </div>
+
+                    <div className="flex justify-between text-orange-600 text-xs">
+                      <span>→ Còn lại (30% + phí):</span>
+                      <span className="font-medium">{order.remainingAmount ? formatVND(order.remainingAmount) : '-'}</span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -399,21 +444,13 @@ const OrderDetailPage = () => {
               </div>
 
               <div className="pt-3 border-t border-gray-200">
-                {Object.entries(totalsByCurrency).map(([currency, amount]) => (
-                  <div key={currency} className="flex justify-between items-baseline mb-2">
-                    <span className="text-gray-600">Total ({currency}):</span>
-                    <span className="text-xl font-bold text-red-600">
-                      {formatPrice(amount, currency)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {Object.keys(totalsByCurrency).length > 1 && (
-                <div className="text-xs text-gray-500 bg-yellow-50 p-2 rounded">
-                  Note: Multiple currencies detected
+                <div className="flex justify-between items-baseline">
+                  <span className="text-gray-600">Tiền hàng:</span>
+                  <span className="text-2xl font-bold text-red-600">
+                    {formatVND(totalVND)}
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="text-sm text-gray-500 border-t border-gray-200 pt-4">

@@ -7,14 +7,14 @@ import { jwtDecode } from 'jwt-decode';
 
 /**
  * AdminRoute Component
- * Wraps routes that require admin authentication
- * Redirects to login if user is not authenticated or not admin
+ * Wraps routes that require admin or staff authentication
+ * Redirects to login if user is not authenticated or not admin/staff
  */
 const AdminRoute = ({ children }) => {
   const { isAuthenticated, loading, token, user, updateUser } = useAuth();
   const location = useLocation();
   const [checkingAdmin, setCheckingAdmin] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
 
   useEffect(() => {
     const checkAdminAccess = async () => {
@@ -31,12 +31,13 @@ const AdminRoute = ({ children }) => {
           try {
             const decoded = jwtDecode(token);
             // JWT token may have role in authorities or role field
-            const role = decoded.role || 
+            const role = decoded.role ||
                         (decoded.authorities && decoded.authorities[0]?.replace('ROLE_', '')) ||
                         (decoded.authorities && decoded.authorities[0]);
-            
-            if (role === 'ADMIN' || role === 'ROLE_ADMIN') {
-              setIsAdmin(true);
+
+            // Allow both ADMIN and STAFF
+            if (role === 'ADMIN' || role === 'ROLE_ADMIN' || role === 'STAFF' || role === 'ROLE_STAFF') {
+              setHasAccess(true);
               setCheckingAdmin(false);
               return;
             }
@@ -46,8 +47,8 @@ const AdminRoute = ({ children }) => {
         }
 
         // If role not in token, check user object
-        if (user && (user.role === 'ADMIN' || user.username === 'admin')) {
-          setIsAdmin(true);
+        if (user && (user.role === 'ADMIN' || user.role === 'STAFF' || user.username === 'admin')) {
+          setHasAccess(true);
           setCheckingAdmin(false);
           return;
         }
@@ -55,19 +56,19 @@ const AdminRoute = ({ children }) => {
         // Fetch user profile to get role
         try {
           const userProfile = await getCurrentUser();
-          if (userProfile.role === 'ADMIN') {
+          if (userProfile.role === 'ADMIN' || userProfile.role === 'STAFF') {
             updateUser(userProfile);
-            setIsAdmin(true);
+            setHasAccess(true);
           } else {
-            setIsAdmin(false);
+            setHasAccess(false);
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
-          setIsAdmin(false);
+          setHasAccess(false);
         }
       } catch (error) {
         console.error('Error checking admin access:', error);
-        setIsAdmin(false);
+        setHasAccess(false);
       } finally {
         setCheckingAdmin(false);
       }
@@ -78,7 +79,7 @@ const AdminRoute = ({ children }) => {
 
   // Show loading while checking authentication
   if (loading || checkingAdmin) {
-    return <Loading message="Checking admin access..." />;
+    return <Loading message="Checking access..." />;
   }
 
   // Redirect to login if not authenticated
@@ -86,12 +87,12 @@ const AdminRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Redirect to home if not admin
-  if (!isAdmin) {
+  // Redirect to home if not admin or staff
+  if (!hasAccess) {
     return <Navigate to="/" replace />;
   }
 
-  // User is admin, render the protected content
+  // User has access, render the protected content
   return children;
 };
 
