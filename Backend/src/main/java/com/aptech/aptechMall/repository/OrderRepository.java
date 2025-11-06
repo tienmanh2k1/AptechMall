@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -78,4 +79,34 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @return true if exists
      */
     boolean existsByOrderNumber(String orderNumber);
+
+    /**
+     * Count orders by status
+     * @param status Order status
+     * @return Number of orders with the given status
+     */
+    long countByStatus(OrderStatus status);
+
+    /**
+     * Sum total amount of orders by status
+     * @param status Order status
+     * @return Total amount of orders with the given status
+     */
+    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.status = :status")
+    BigDecimal sumTotalAmountByStatus(@Param("status") OrderStatus status);
+
+    /**
+     * Find all orders by status with pagination
+     * @param status Order status
+     * @param pageable Pagination information
+     * @return Page of Orders
+     */
+    Page<Order> findByStatusOrderByCreatedAtDesc(OrderStatus status, Pageable pageable);
+
+    /**
+     * Find all orders with pagination
+     * @param pageable Pagination information
+     * @return Page of Orders
+     */
+    Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

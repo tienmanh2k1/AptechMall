@@ -16,4 +16,9 @@ public class UpdateOrderStatusRequest {
 
     @NotNull(message = "Order status is required")
     private OrderStatus status;
+
+    /**
+     * Optional note explaining the status change (for admin)
+     */
+    private String note;
 }

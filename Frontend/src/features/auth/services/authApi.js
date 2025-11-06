@@ -111,3 +111,46 @@ export const refreshToken = async () => {
     throw error;
   }
 };
+
+/**
+ * Login user with Google OAuth
+ * @param {Object} authRequest
+ * @param {string} authRequest.email - Google email
+ * @param {string} authRequest.fullName - Google Full Name
+ * @param {string} authRequest.googleSub - Google Id
+ * @param {string} username - Either from form's username or Username from Email
+ * @returns {Promise<Object>} Response with token
+ */
+export const googleOauth = async (authRequest, username) => {
+  try {
+    console.log("Email in googleOauth: " + authRequest.email);
+    // Backend expects AuthRequest with:
+    // - username (used as email)
+    // - fullname (lowercase 'n')
+    const response = await api.post('/auth/login?method=google', {
+      username: authRequest.email,  // Backend uses 'username' field to store email
+      fullname: authRequest.fullName,  // Backend uses lowercase 'fullname'
+      password: ""  // Empty password for OAuth
+    });
+
+    // Backend returns: { token: "eyJhbGci..." }
+    return response.data;
+  } catch (error) {
+    console.error('Google OAuth login error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate Refresh Token for OAuth Users
+ * @returns {Promise<Object>} Success response
+ */
+export const generateRefreshOauth = async () => {
+  try {
+    const response = await api.post('/auth/oauth');
+    return response.data;
+  } catch (error) {
+    console.error('Generate OAuth refresh token error:', error);
+    throw error;
+  }
+};

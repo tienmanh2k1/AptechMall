@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { getCart } from '../../cart/services';
 import { checkout } from '../services';
 import { useCart } from '../../cart/context/CartContext';
+import { useCurrency } from '../../currency/context/CurrencyContext';
+import { formatCurrency } from '../../currency/services/currencyApi';
 import OrderItemsList from '../components/OrderItemsList';
 import Loading from '../../../shared/components/Loading';
 import ErrorMessage from '../../../shared/components/ErrorMessage';
-import { formatPrice } from '../../../shared/utils/formatters';
-import { normalizeMarketplace } from '../../../shared/utils/marketplace';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Wallet } from 'lucide-react';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { refreshCart } = useCart();
+  const { toVND, exchangeRates } = useCurrency();
+
+  // Get selected item IDs from navigation state (passed from CartSummary)
+  const selectedItemIds = location.state?.selectedItemIds || [];
+
   const [cart, setCart] = useState({ items: [] });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -36,11 +42,20 @@ const CheckoutPage = () => {
         setError(null);
         // User ID is automatically extracted from JWT token by backend
         const data = await getCart();
-        setCart(data);
 
-        // Redirect if cart is empty
-        if (!data.items || data.items.length === 0) {
-          toast.info('Your cart is empty');
+        // Filter cart to only include selected items
+        const filteredCart = {
+          ...data,
+          items: selectedItemIds.length > 0
+            ? data.items?.filter(item => selectedItemIds.includes(item.id)) || []
+            : data.items || []
+        };
+
+        setCart(filteredCart);
+
+        // Redirect if no items selected or cart is empty
+        if (!filteredCart.items || filteredCart.items.length === 0) {
+          toast.info(selectedItemIds.length > 0 ? 'Selected items not found in cart' : 'Your cart is empty');
           navigate('/cart');
         }
       } catch (err) {
@@ -52,7 +67,7 @@ const CheckoutPage = () => {
     };
 
     fetchCart();
-  }, [navigate]);
+  }, [navigate, selectedItemIds]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -101,35 +116,61 @@ const CheckoutPage = () => {
     try {
       setSubmitting(true);
       // User ID is automatically extracted from JWT token by backend
-      const order = await checkout(formData);
+      // Include selected item IDs in checkout request
+      const checkoutData = {
+        ...formData,
+        itemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined
+      };
+      const order = await checkout(checkoutData);
 
-      // Refresh cart count (should be 0 now)
+      // Refresh cart count (items will be removed from cart)
       refreshCart();
 
       toast.success('Order placed successfully!');
       navigate(`/orders/success?orderNumber=${order.orderNumber || order.id}`);
     } catch (err) {
       console.error('Error placing order:', err);
-      toast.error(err.response?.data?.message || 'Failed to place order');
+      const errorMessage = err.response?.data?.message || 'Failed to place order';
+
+      // Check if error is insufficient funds
+      if (errorMessage.toLowerCase().includes('insufficient')) {
+        // Show error with deposit link
+        toast.error(
+          <div>
+            <div className="font-medium mb-1">Insufficient Wallet Balance</div>
+            <div className="text-sm">{errorMessage}</div>
+            <button
+              onClick={() => navigate('/wallet')}
+              className="mt-2 text-xs underline text-white hover:text-blue-200"
+            >
+              Go to Wallet to Deposit
+            </button>
+          </div>,
+          { autoClose: false }
+        );
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Calculate totals by currency
-  const totalsByCurrency = cart.items?.reduce((acc, item) => {
-    // Infer currency from marketplace if not provided by backend
-    const platform = normalizeMarketplace(item.platform || item.marketplace);
-    const currency = item.currency || (platform === 'aliexpress' ? 'USD' : 'CNY');
-    const itemTotal = item.price * item.quantity;
-
-    if (!acc[currency]) {
-      acc[currency] = 0;
+  // Calculate total in VND
+  let totalVND = 0;
+  if (cart.items && exchangeRates) {
+    for (const item of cart.items) {
+      const currency = item.currency || 'USD';
+      const itemTotal = item.price * item.quantity;
+      const vndAmount = toVND(itemTotal, currency);
+      if (vndAmount !== null) {
+        totalVND += vndAmount;
+      }
     }
-    acc[currency] += itemTotal;
+  }
 
-    return acc;
-  }, {}) || {};
+  // Calculate 70% deposit
+  const depositVND = totalVND * 0.70;
 
   const totalItems = cart.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
@@ -252,22 +293,42 @@ const CheckoutPage = () => {
                 <span className="font-medium text-gray-900">{totalItems}</span>
               </div>
 
-              <div className="pt-3 border-t border-gray-200">
-                {Object.entries(totalsByCurrency).map(([currency, amount]) => (
-                  <div key={currency} className="flex justify-between items-baseline mb-2">
-                    <span className="text-gray-600">Total ({currency}):</span>
-                    <span className="text-xl font-bold text-gray-900">
-                      {formatPrice(amount, currency)}
-                    </span>
+              <div className="pt-3 border-t border-gray-200 space-y-2">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-gray-600">Product Total:</span>
+                  <span className="text-lg font-medium text-gray-900">
+                    {exchangeRates ? formatCurrency(totalVND, 'VND') : 'Loading...'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-baseline pt-2 border-t border-gray-100">
+                  <div>
+                    <div className="text-sm font-medium text-blue-600">Deposit Now (70%)</div>
+                    <div className="text-xs text-gray-500">Pay from wallet</div>
                   </div>
-                ))}
+                  <span className="text-xl font-bold text-blue-600">
+                    {exchangeRates ? formatCurrency(depositVND, 'VND') : 'Loading...'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-baseline text-sm pb-2">
+                  <span className="text-gray-500">Remaining (30%)</span>
+                  <span className="text-gray-600">
+                    {exchangeRates ? formatCurrency(totalVND - depositVND, 'VND') : 'Loading...'}
+                  </span>
+                </div>
               </div>
 
-              {Object.keys(totalsByCurrency).length > 1 && (
-                <div className="text-xs text-gray-500 bg-yellow-50 p-2 rounded">
-                  Note: Multiple currencies detected
+              {!exchangeRates && (
+                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                  Loading exchange rates...
                 </div>
               )}
+
+              <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                <Wallet className="w-4 h-4 inline mr-1" />
+                Payment will be deducted from your wallet. Remaining 30% + fees will be charged later.
+              </div>
             </div>
 
             {/* Order Items */}

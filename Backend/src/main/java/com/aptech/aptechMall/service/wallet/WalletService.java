@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service for managing user wallet and transactions
@@ -252,6 +254,34 @@ public class WalletService {
         wallet.unlock();
         walletRepository.save(wallet);
         log.info("Unlocked wallet for user {}", userId);
+    }
+
+    /**
+     * Get all wallets (admin operation)
+     * @return List of all wallets with user information
+     */
+    public List<WalletResponse> getAllWallets() {
+        List<UserWallet> wallets = walletRepository.findAll();
+
+        return wallets.stream()
+                .map(wallet -> {
+                    User user = wallet.getUser();
+                    String depositCode = generateDepositCode(user);
+
+                    return WalletResponse.builder()
+                            .walletId(wallet.getId())
+                            .userId(user.getUserId())
+                            .username(user.getUsername())
+                            .email(user.getEmail())
+                            .fullName(user.getFullName())
+                            .balance(wallet.getBalance())
+                            .isLocked(wallet.isLocked())
+                            .createdAt(wallet.getCreatedAt())
+                            .updatedAt(wallet.getUpdatedAt())
+                            .depositCode(depositCode)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     /**

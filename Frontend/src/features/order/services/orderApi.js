@@ -18,15 +18,23 @@ import api from '../../../shared/services/api';
  * @param {string} checkoutData.shippingAddress - Shipping address
  * @param {string} checkoutData.phone - Phone number
  * @param {string} checkoutData.note - Order note (optional)
+ * @param {Array<number>} checkoutData.itemIds - Optional cart item IDs to checkout (defaults to all items if not provided)
  * @returns {Promise<Object>} Created order with orderNumber
  */
 export const checkout = async (checkoutData) => {
   try {
-    const response = await api.post('/orders/checkout', {
+    const requestBody = {
       shippingAddress: checkoutData.shippingAddress,
       phone: checkoutData.phone,
       note: checkoutData.note || ''
-    });
+    };
+
+    // Include itemIds if provided (for partial cart checkout)
+    if (checkoutData.itemIds && checkoutData.itemIds.length > 0) {
+      requestBody.itemIds = checkoutData.itemIds;
+    }
+
+    const response = await api.post('/orders/checkout', requestBody);
     // Backend returns { data: {...}, message: "...", success: true }
     return response.data.data;
   } catch (error) {
@@ -140,6 +148,25 @@ export const cancelOrder = async (orderId) => {
     return response.data.data;
   } catch (error) {
     console.error('Error cancelling order:', error);
+    throw error;
+  }
+};
+
+/**
+ * Pay remaining amount (30% + fees) from wallet
+ * Backend: POST /api/orders/{orderId}/pay-remaining
+ * User ID is automatically extracted from JWT token by backend
+ *
+ * @param {number} orderId - Order ID
+ * @returns {Promise<Object>} Updated order with new payment status
+ */
+export const payRemainingAmount = async (orderId) => {
+  try {
+    const response = await api.post(`/orders/${orderId}/pay-remaining`);
+    // Backend returns { data: {...}, message: "...", success: true }
+    return response.data.data;
+  } catch (error) {
+    console.error('Error paying remaining amount:', error);
     throw error;
   }
 };

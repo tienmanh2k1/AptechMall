@@ -17,6 +17,11 @@ import OrderDetailPage from './features/order/pages/OrderDetailPage';
 import CartDebugPage from './features/cart/pages/CartDebugPage';
 import AdminRoute from './features/admin/components/AdminRoute';
 import AdminShopManagementPage from './features/admin/pages/AdminShopManagementPage';
+import AdminSystemFeeConfigPage from './features/admin/pages/AdminSystemFeeConfigPage';
+import AdminUserManagementPage from './features/admin/pages/AdminUserManagementPage';
+import AdminWalletManagementPage from './features/admin/pages/AdminWalletManagementPage';
+import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
+import AdminOrderManagementPage from './features/admin/pages/AdminOrderManagementPage';
 import WalletPage from './features/wallet/pages/WalletPage';
 import BankTransferDepositPage from './features/wallet/pages/BankTransferDepositPage';
 import TransactionHistoryPage from './features/wallet/pages/TransactionHistoryPage';
@@ -150,10 +155,50 @@ function App() {
 
               {/* Admin routes - Require admin role */}
               <Route
+                path="/admin/dashboard"
+                element={
+                  <AdminRoute>
+                    <AdminDashboardPage />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/orders"
+                element={
+                  <AdminRoute>
+                    <AdminOrderManagementPage />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <AdminRoute>
+                    <AdminUserManagementPage />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/wallets"
+                element={
+                  <AdminRoute>
+                    <AdminWalletManagementPage />
+                  </AdminRoute>
+                }
+              />
+              <Route
                 path="/admin/shops"
                 element={
                   <AdminRoute>
                     <AdminShopManagementPage />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/fee-config"
+                element={
+                  <AdminRoute>
+                    <AdminSystemFeeConfigPage />
                   </AdminRoute>
                 }
               />

@@ -1,40 +1,37 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
-import { formatPrice } from '../../../shared/utils/formatters';
+import { useCurrency } from '../../currency/context/CurrencyContext';
+import { formatCurrency } from '../../currency/services/currencyApi';
 
 const CartSummary = ({ cart, selectedItems = new Set(), loading }) => {
   const navigate = useNavigate();
+  const { toVND, exchangeRates } = useCurrency();
 
   // Filter only selected items
   const selectedCartItems = cart.items?.filter(item => selectedItems.has(item.id)) || [];
 
-  // Calculate totals by currency for selected items only
-  const totalsByCurrency = selectedCartItems.reduce((acc, item) => {
+  // Calculate total in VND for selected items
+  let totalVND = 0;
+  for (const item of selectedCartItems) {
     const currency = item.currency || 'USD';
-    // Ensure price is a number
     const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
     const itemTotal = price * item.quantity;
 
-    if (!acc[currency]) {
-      acc[currency] = 0;
+    const vndAmount = toVND(itemTotal, currency);
+    if (vndAmount !== null) {
+      totalVND += vndAmount;
     }
-    acc[currency] += itemTotal;
-
-    return acc;
-  }, {});
+  }
 
   const totalItems = selectedCartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckout = () => {
-    navigate('/checkout');
-  };
-
-  // Get currency symbol
-  const getCurrencySymbol = (currency) => {
-    if (currency === 'CNY') return '¥';
-    if (currency === 'USD') return '$';
-    return currency;
+    // Pass selected item IDs to checkout page via navigation state
+    const selectedItemIds = Array.from(selectedItems);
+    navigate('/checkout', {
+      state: { selectedItemIds }
+    });
   };
 
   return (
@@ -48,36 +45,26 @@ const CartSummary = ({ cart, selectedItems = new Set(), loading }) => {
           <span className="font-medium text-gray-900">{totalItems}</span>
         </div>
 
-        {/* Subtotal by Currency */}
+        {/* Total in VND */}
         <div className="pt-3 border-t border-gray-200">
-          {Object.entries(totalsByCurrency).map(([currency, amount]) => (
-            <div key={currency} className="mb-3">
-              {/* Main Price */}
-              <div className="flex justify-between items-baseline mb-1">
-                <span className="text-sm text-gray-600">Tiền hàng:</span>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-gray-900">
-                    {formatPrice(amount, currency)}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {getCurrencySymbol(currency)}{(amount || 0).toFixed(2)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Service Fee Placeholder */}
-              <div className="flex justify-between items-baseline text-sm mb-1">
-                <span className="text-gray-600">Phí dịch vụ:</span>
-                <span className="text-gray-500">Cập nhật</span>
-              </div>
-
-              {/* Shipping Fee Placeholder */}
-              <div className="flex justify-between items-baseline text-sm">
-                <span className="text-gray-600">Phí vận chuyển:</span>
-                <span className="text-gray-500">Cập nhật</span>
-              </div>
+          <div className="flex justify-between items-baseline mb-3">
+            <span className="text-sm text-gray-600">Tiền hàng:</span>
+            <div className="text-xl font-bold text-gray-900">
+              {exchangeRates ? formatCurrency(totalVND, 'VND') : 'Đang tải...'}
             </div>
-          ))}
+          </div>
+
+          {/* Service Fee Placeholder */}
+          <div className="flex justify-between items-baseline text-sm mb-1">
+            <span className="text-gray-600">Phí dịch vụ:</span>
+            <span className="text-gray-500">Cập nhật khi đặt hàng</span>
+          </div>
+
+          {/* Shipping Fee Placeholder */}
+          <div className="flex justify-between items-baseline text-sm">
+            <span className="text-gray-600">Phí vận chuyển:</span>
+            <span className="text-gray-500">Cập nhật khi đặt hàng</span>
+          </div>
         </div>
 
         {/* Note about selection */}
@@ -87,10 +74,10 @@ const CartSummary = ({ cart, selectedItems = new Set(), loading }) => {
           </div>
         )}
 
-        {/* Note about mixed currencies */}
-        {Object.keys(totalsByCurrency).length > 1 && (
-          <div className="text-xs text-gray-500 bg-yellow-50 p-3 rounded">
-            Giỏ hàng có sản phẩm từ nhiều marketplace với đơn vị tiền tệ khác nhau.
+        {/* Loading exchange rates */}
+        {!exchangeRates && selectedItems.size > 0 && (
+          <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded">
+            Đang tải tỷ giá...
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 package com.aptech.aptechMall.repository;
 
 import com.aptech.aptechMall.model.jpa.User;
+import com.aptech.aptechMall.security.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -29,4 +30,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+
+    /**
+     * Count users by status
+     * @param status User status (ACTIVE, SUSPENDED, DELETED)
+     * @return Number of users with the given status
+     */
+    long countByStatus(Status status);
 }

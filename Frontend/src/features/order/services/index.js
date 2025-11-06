@@ -49,3 +49,8 @@ export const getOrderByNumber = async (...args) => {
   const module = await api;
   return module.getOrderByNumber(...args);
 };
+
+export const payRemainingAmount = async (...args) => {
+  const module = await api;
+  return module.payRemainingAmount(...args);
+};

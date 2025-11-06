@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -129,7 +130,7 @@ public class OrderController {
     }
 
     /**
-     * Update order status
+     * Update order status (ADMIN ONLY)
      * PUT /api/orders/{orderId}/status
      *
      * @param orderId Order ID
@@ -137,6 +138,7 @@ public class OrderController {
      * @return Updated OrderResponse
      */
     @PutMapping("/{orderId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request) {
@@ -168,6 +170,26 @@ public class OrderController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(order, "Order cancelled successfully")
+        );
+    }
+
+    /**
+     * Pay remaining amount (30% + fees) from wallet
+     * POST /api/orders/{orderId}/pay-remaining
+     *
+     * @param orderId Order ID
+     * @return Updated OrderResponse
+     */
+    @PostMapping("/{orderId}/pay-remaining")
+    public ResponseEntity<ApiResponse<OrderResponse>> payRemainingAmount(
+            @PathVariable Long orderId) {
+        Long userId = AuthenticationUtil.getCurrentUserId();
+        log.info("POST /api/orders/{}/pay-remaining - userId: {}", orderId, userId);
+
+        OrderResponse order = orderService.payRemainingAmount(userId, orderId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(order, "Remaining amount paid successfully")
         );
     }
 }

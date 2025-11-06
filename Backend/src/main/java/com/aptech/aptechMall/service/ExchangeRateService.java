@@ -55,16 +55,45 @@ public class ExchangeRateService {
     }
 
     public ExchangeRateResponse getRate(String currency) {
-        ExchangeRate rate = exchangeRateRepository
+        return exchangeRateRepository
             .findByCurrency(currency.toUpperCase())
-            .orElseThrow(() -> new RuntimeException(
-                "Exchange rate not found for: " + currency));
+            .map(rate -> ExchangeRateResponse.builder()
+                    .currency(rate.getCurrency())
+                    .rateToVnd(rate.getRateToVnd())
+                    .source(rate.getSource())
+                    .updatedAt(rate.getUpdatedAt())
+                    .build())
+            .orElseGet(() -> getFallbackRate(currency));
+    }
+
+    /**
+     * Get fallback exchange rate if database rate not available
+     * @param currency Currency code
+     * @return Fallback exchange rate
+     */
+    private ExchangeRateResponse getFallbackRate(String currency) {
+        log.warn("⚠️ Using fallback exchange rate for {}", currency);
+
+        // Default fallback rates (conservative estimates)
+        BigDecimal defaultRate;
+        switch (currency.toUpperCase()) {
+            case "USD":
+                defaultRate = BigDecimal.valueOf(25000);
+                break;
+            case "CNY":
+                defaultRate = BigDecimal.valueOf(3500);
+                break;
+            default:
+                log.error("❌ No fallback rate available for currency: {}", currency);
+                throw new RuntimeException(
+                    "Exchange rate not available for: " + currency);
+        }
 
         return ExchangeRateResponse.builder()
-                .currency(rate.getCurrency())
-                .rateToVnd(rate.getRateToVnd())
-                .source(rate.getSource())
-                .updatedAt(rate.getUpdatedAt())
+                .currency(currency.toUpperCase())
+                .rateToVnd(defaultRate)
+                .source("FALLBACK")
+                .updatedAt(java.time.LocalDateTime.now())
                 .build();
     }
 

@@ -11,9 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * REST Controller for wallet operations
@@ -181,6 +183,7 @@ public class WalletController {
      * @return Success message
      */
     @PostMapping("/{userId}/lock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> lockWallet(@PathVariable("userId") Long targetUserId) {
         try {
             // TODO: Add admin authorization check
@@ -203,6 +206,7 @@ public class WalletController {
      * @return Success message
      */
     @PostMapping("/{userId}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> unlockWallet(@PathVariable("userId") Long targetUserId) {
         try {
             // TODO: Add admin authorization check
@@ -215,6 +219,27 @@ public class WalletController {
             log.error("Error unlocking wallet: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("SERVER_ERROR", "Failed to unlock wallet", e.getMessage()));
+        }
+    }
+
+    /**
+     * Get all wallets (admin operation)
+     * GET /api/wallet/admin/all
+     * @return List of all wallets
+     */
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<WalletResponse>>> getAllWallets() {
+        try {
+            log.info("GET /api/wallet/admin/all");
+
+            List<WalletResponse> wallets = walletService.getAllWallets();
+            return ResponseEntity.ok(ApiResponse.success(wallets, "Wallets retrieved successfully"));
+
+        } catch (Exception e) {
+            log.error("Error getting all wallets: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("SERVER_ERROR", "Failed to get wallets", e.getMessage()));
         }
     }
 }

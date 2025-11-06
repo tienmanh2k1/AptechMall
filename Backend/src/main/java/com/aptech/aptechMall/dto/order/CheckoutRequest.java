@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * DTO for checkout request
  */
@@ -24,4 +26,10 @@ public class CheckoutRequest {
 
     @Size(max = 1000, message = "Note must not exceed 1000 characters")
     private String note;
+
+    /**
+     * Optional list of cart item IDs to checkout
+     * If null or empty, all cart items will be checked out
+     */
+    private List<Long> itemIds;
 }

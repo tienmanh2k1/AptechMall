@@ -26,6 +26,13 @@ public class WalletResponse {
     private LocalDateTime updatedAt;
 
     /**
+     * User information (for admin view)
+     */
+    private String username;
+    private String email;
+    private String fullName;
+
+    /**
      * Deposit code for bank transfer
      * Format: Username (if exists) or USER{userId}
      * No special characters - safe for bank transfer notes
