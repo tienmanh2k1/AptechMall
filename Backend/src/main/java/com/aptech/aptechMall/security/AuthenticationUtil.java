@@ -42,7 +42,7 @@ public class AuthenticationUtil {
      */
     public static Long getCurrentUserId() {
         User user = getCurrentUser();
-        Long userId = user.getId();
+        Long userId = user.getUserId();
 
         if (userId == null) {
             throw new IllegalStateException(

@@ -31,7 +31,7 @@ public class UserManagementService {
 
     private UserResponseDTO toDTO(User user) {
         UserResponseDTO dto = new UserResponseDTO();
-        dto.setUserId(user.getId());
+        dto.setUserId(user.getUserId());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
         dto.setFullName(user.getFullName());
