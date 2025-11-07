@@ -22,6 +22,77 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Service quản lý tỷ giá ngoại tệ (Exchange Rate Management)
+ *
+ * Chức năng chính:
+ * - Lấy tỷ giá từ RapidAPI (USD/CNY → VND)
+ * - Cache tỷ giá trong database
+ * - Cung cấp fallback rates khi API không available
+ * - Convert tiền tệ giữa các loại (USD, CNY, VND)
+ *
+ * TỶ GIÁ CẦN THIẾT:
+ * - **USD → VND**: Cho sản phẩm AliExpress (marketplace = ALIEXPRESS)
+ * - **CNY → VND**: Cho sản phẩm 1688 (marketplace = ALIBABA1688)
+ *
+ * NGUỒN TỶ GIÁ (Priority order):
+ * 1. **RAPIDAPI**: Tỷ giá real-time từ RapidAPI Exchange Rate API
+ * 2. **MANUAL**: Admin cập nhật thủ công (override API rate)
+ * 3. **FALLBACK**: Hardcoded values khi API không available
+ *
+ * FALLBACK RATES (Conservative estimates):
+ * - USD: 25,000 VND (thực tế ~24,000-25,000)
+ * - CNY: 3,500 VND (thực tế ~3,400-3,600)
+ * - Rates này cao hơn thực tế một chút để tránh loss
+ *
+ * INITIALIZATION (@PostConstruct):
+ * - Khi application start, check database có tỷ giá chưa
+ * - Nếu database rỗng → fetch từ RapidAPI ngay lập tức
+ * - Nếu đã có tỷ giá → skip (dùng rates hiện tại)
+ *
+ * CACHING STRATEGY:
+ * - Tỷ giá được lưu trong database (ExchangeRate entity)
+ * - Không tự động update định kỳ (phải manual trigger)
+ * - Tỷ giá ổn định → không cần update thường xuyên
+ * - Admin có thể manual update khi cần
+ *
+ * CURRENCY CONVERSION:
+ * - Hỗ trợ convert giữa USD, CNY, VND
+ * - Luôn convert qua VND làm intermediate
+ * - Ví dụ: USD → CNY = USD → VND → CNY
+ *
+ * ROUNDING:
+ * - VND: Làm tròn về số nguyên (HALF_UP)
+ * - USD/CNY: 2 chữ số thập phân
+ *
+ * USE CASES:
+ *
+ * 1. **Checkout (OrderService)**:
+ *    - User checkout giỏ hàng có sản phẩm AliExpress (USD)
+ *    - System lấy tỷ giá USD → VND
+ *    - Convert item prices sang VND để tính tổng
+ *
+ * 2. **Fee Calculation (FeeCalculationService)**:
+ *    - Wooden packaging fee: 20 CNY → VND
+ *    - Bubble wrap fee: 10 CNY → VND
+ *    - Accessory detection: USD → CNY để so sánh với 10 CNY threshold
+ *
+ * 3. **Admin Fee Update (OrderService.updateOrderFees)**:
+ *    - Admin nhập domestic shipping fee bằng CNY
+ *    - System convert CNY → VND để cộng vào total amount
+ *
+ * RAPIDAPI CONFIGURATION:
+ * - API Key: Lưu trong application.properties
+ * - Host: currency-conversion-and-exchange-rates.p.rapidapi.com
+ * - Base URL: https://currency-conversion-and-exchange-rates.p.rapidapi.com
+ * - Endpoint: /convert?base={from}&target={to}
+ * - Free tier: 100 requests/month (đủ cho cache strategy)
+ *
+ * ERROR HANDLING:
+ * - Nếu RapidAPI fail → log error và tiếp tục (không crash app)
+ * - Nếu database không có rate → dùng fallback rate
+ * - Fallback rate đảm bảo system luôn hoạt động được
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -54,6 +125,14 @@ public class ExchangeRateService {
                 ));
     }
 
+    /**
+     * Lấy tỷ giá của một loại tiền tệ
+     *
+     * Tìm trong database trước, nếu không có → dùng fallback rate
+     *
+     * @param currency Mã tiền tệ (USD, CNY)
+     * @return ExchangeRateResponse với rate, source, updatedAt
+     */
     public ExchangeRateResponse getRate(String currency) {
         return exchangeRateRepository
             .findByCurrency(currency.toUpperCase())
@@ -197,11 +276,38 @@ public class ExchangeRateService {
     }
 
     /**
-     * Convert amount from one currency to another
-     * @param amount Amount to convert
-     * @param fromCurrency Source currency code
-     * @param toCurrency Target currency code
-     * @return Converted amount
+     * Convert số tiền từ loại tiền này sang loại tiền khác
+     *
+     * CONVERSION LOGIC:
+     * - Nếu cùng currency → return nguyên amount (no conversion)
+     * - fromCurrency → VND: Nhân với rate
+     * - VND → toCurrency: Chia cho rate
+     * - fromCurrency → toCurrency: Convert qua VND (fromCurrency → VND → toCurrency)
+     *
+     * VÍ DỤ:
+     * 1. USD → VND:
+     *    - 100 USD x 25,000 = 2,500,000 VND
+     *
+     * 2. CNY → VND:
+     *    - 100 CNY x 3,500 = 350,000 VND
+     *
+     * 3. USD → CNY (qua VND):
+     *    - 100 USD → 2,500,000 VND
+     *    - 2,500,000 VND ÷ 3,500 = 714.29 CNY
+     *
+     * ROUNDING:
+     * - Target = VND: Làm tròn về số nguyên (HALF_UP)
+     * - Target = USD/CNY: 2 chữ số thập phân
+     *
+     * USE CASES:
+     * - OrderService.checkout(): USD/CNY → VND để tính tổng đơn hàng
+     * - FeeCalculationService: CNY → VND cho packaging fees
+     * - FeeCalculationService: USD → CNY cho accessory detection
+     *
+     * @param amount Số tiền cần convert
+     * @param fromCurrency Loại tiền nguồn (USD, CNY, VND)
+     * @param toCurrency Loại tiền đích (USD, CNY, VND)
+     * @return Số tiền sau khi convert
      */
     public BigDecimal convertCurrency(BigDecimal amount, String fromCurrency, String toCurrency) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
