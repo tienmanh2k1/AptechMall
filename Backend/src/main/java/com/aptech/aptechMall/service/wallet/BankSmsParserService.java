@@ -9,8 +9,82 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Service for parsing bank SMS messages
- * Extracts transaction information from SMS text
+ * Service parse SMS ngân hàng để nạp tiền tự động
+ *
+ * Chức năng chính:
+ * - Parse SMS từ ngân hàng để extract thông tin giao dịch
+ * - Extract: Số tiền, mã GD, username/deposit code, user ID
+ * - Validate SMS từ ngân hàng đã biết
+ *
+ * TÍCH HỢP SMS BANKING:
+ * User chuyển khoản → Ngân hàng gửi SMS → SMS forwarding app → Backend webhook
+ * → Parse SMS → Extract thông tin → Tự động nạp tiền vào ví
+ *
+ * ⚠️ DEVELOPMENT/TESTING FEATURE ONLY:
+ * - Đây là tính năng cho môi trường dev/testing
+ * - Production nên dùng official payment gateways (VNPay, MoMo, ZaloPay)
+ * - SMS parsing có thể không chính xác 100%
+ * - Các ngân hàng có thể thay đổi format SMS bất kỳ lúc nào
+ *
+ * SUPPORTED SMS FORMATS:
+ *
+ * 1. MBBank:
+ *    "TK 09xxx279 GD: +200,000VND 05/11/25 07:21 SD: 335,163VND ND: MBVCB.11586295199.373933.TRIEU THIHONG THAO chuyen tien USER123"
+ *
+ * 2. Vietcombank:
+ *    "TK 1234567890 +500,000 VND. GD: 123456. ND: NAP TIEN USER123"
+ *
+ * 3. Generic format:
+ *    "+500000d GD:123456 ND:NAPTIEN USER123"
+ *
+ * 4. Simple format:
+ *    "Tai khoan +500k USER123"
+ *
+ * 5. Test format (for testing):
+ *    "GD 100k USER1"
+ *
+ * EXTRACT INFORMATION:
+ * - **Amount**: +500,000 VND, +500k, 500,000VND (nhiều pattern)
+ * - **Transaction Reference**: GD number, MBVCB code (để prevent duplicate)
+ * - **Username/Deposit Code**: DEMOACCOUNT, VANA (alphanumeric only)
+ * - **User ID**: USER123 → userId = 123
+ * - **Email**: demo@gmail.com (deprecated, có special chars)
+ *
+ * USER IDENTIFICATION (Priority):
+ * 1. **Username/Deposit Code** (PREFERRED):
+ *    - Format: Alphanumeric only (A-Z, 0-9), 3-30 ký tự
+ *    - Ví dụ: "NAP TIEN DEMOACCOUNT", "NAPTIEN VANA"
+ *    - Safe cho bank transfer content (không có ký tự đặc biệt)
+ *
+ * 2. **User ID** (FALLBACK):
+ *    - Format: USER{id} hoặc U{id}
+ *    - Ví dụ: "USER123", "U456", "NAP TIEN USER789"
+ *    - Dễ nhớ hơn username cho user
+ *
+ * 3. **Email** (DEPRECATED):
+ *    - Format: demo@gmail.com
+ *    - ⚠️ Deprecated: Email có ký tự đặc biệt (@, .) → một số ngân hàng reject
+ *
+ * REGEX PATTERNS:
+ * - Service sử dụng nhiều regex patterns với priority order
+ * - Pattern có + sign được ưu tiên để tránh match account number
+ * - Pattern có GD: sau ND: để tránh match amount trong "GD: +200,000VND"
+ *
+ * ERROR HANDLING:
+ * - Nếu parse fail → set sms.error với error message
+ * - Return false để indicate parse failure
+ * - Log warning để debug
+ *
+ * TRANSACTION REFERENCE (Duplicate Prevention):
+ * - Extract GD number hoặc MBVCB code từ SMS
+ * - BankTransferController check duplicate trước khi nạp tiền
+ * - Nếu trùng GD number → reject để prevent double-credit
+ *
+ * KNOWN BANKS:
+ * - Vietcombank (VCB), Techcombank (TCB), BIDV, Agribank
+ * - MBBank (MB), VietinBank, Sacombank, ACB
+ * - VPBank, TPBank, HDBank, SHBBank (SHB)
+ * - isFromKnownBank() validate sender để filter spam
  */
 @Service
 @Slf4j
