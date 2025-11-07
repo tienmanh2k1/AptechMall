@@ -29,12 +29,75 @@ import java.time.format.DateTimeFormatter;
 import java.util.Random;
 
 /**
- * Service for managing order operations
+ * Service quản lý đơn hàng (Order Management)
+ *
+ * Chức năng chính:
+ * - Checkout: Tạo đơn hàng từ giỏ hàng
+ * - Thanh toán: Trừ tiền từ ví điện tử (70% cọc + 30% còn lại)
+ * - Quản lý đơn hàng: Xem danh sách, chi tiết đơn hàng
+ * - Hủy đơn: Hủy và hoàn tiền về ví
+ * - Admin: Quản lý tất cả đơn hàng, cập nhật trạng thái, cập nhật phí
+ *
+ * LUỒNG ĐẶT HÀNG (Checkout):
+ * 1. User chọn sản phẩm trong giỏ → POST /api/orders/checkout
+ * 2. System tính tổng tiền sản phẩm (convert USD/CNY → VND)
+ * 3. Tính phí dịch vụ 1.5% trên tổng giá trị sản phẩm
+ * 4. Tính tiền cọc 70% (deposit) và tiền còn lại 30% (remaining)
+ * 5. Kiểm tra số dư ví đủ trả tiền cọc không
+ * 6. Trừ tiền cọc từ ví → Tạo transaction ORDER_PAYMENT
+ * 7. Lưu đơn hàng với status PENDING
+ * 8. Xóa các item đã checkout khỏi giỏ hàng
+ *
+ * HỆ THỐNG THANH TOÁN:
+ * - Deposit (70%): Thanh toán ngay khi checkout
+ * - Remaining (30% + phí phát sinh): Thanh toán sau khi admin cập nhật phí
+ * - Phí bao gồm: Product cost + Service fee (1.5%) + Shipping fees + Additional services
+ *
+ * TỶ GIÁ NGOẠI TỆ:
+ * - AliExpress: USD → VND (ExchangeRateService)
+ * - Alibaba 1688: CNY → VND (ExchangeRateService)
+ * - Tỷ giá được cache và cập nhật định kỳ
+ *
+ * QUẢN LÝ PHÍ (Fee Management):
+ * - Service Fee: 1.5% trên tổng giá trị sản phẩm (tự động tính)
+ * - Domestic Shipping Fee: Phí ship nội địa Trung Quốc (admin nhập bằng CNY)
+ * - International Shipping Fee: Phí ship quốc tế Trung → Việt (admin nhập bằng VND)
+ * - Additional Services Fee: Phí dịch vụ thêm (đóng gỗ, bọc bong bóng, đếm hàng, v.v.)
+ *
+ * VÒNG ĐỜI ĐƠN HÀNG (Order Lifecycle):
+ * 1. PENDING - Đơn hàng mới tạo, chờ xác nhận
+ * 2. CONFIRMED - Admin xác nhận và order từ marketplace
+ * 3. PURCHASING - Đang mua hàng từ marketplace
+ * 4. IN_TRANSIT - Hàng đang vận chuyển
+ * 5. DELIVERED - Đã giao hàng thành công
+ * 6. CANCELLED - Đã hủy (có hoàn tiền nếu đã thanh toán)
+ *
+ * HỦY ĐƠN VÀ HOÀN TIỀN:
+ * - User chỉ hủy được đơn ở trạng thái PENDING
+ * - Admin có thể hủy đơn ở bất kỳ trạng thái nào
+ * - Khi hủy đơn đã thanh toán → tự động hoàn tiền về ví
+ * - Tạo transaction ORDER_REFUND để ghi nhận hoàn tiền
+ *
+ * BẢO MẬT:
+ * - userId được lấy từ JWT token (AuthenticationUtil.getCurrentUserId())
+ * - User chỉ xem/sửa đơn hàng của chính mình
+ * - Admin/Staff có quyền xem/sửa tất cả đơn hàng
+ * - Verify ownership trước mọi thao tác (getOrderDetail, cancelOrder, v.v.)
+ *
+ * TRANSACTION:
+ * - @Transactional: Tất cả methods chạy trong transaction
+ * - Checkout là atomic: Tạo order + Trừ tiền ví + Xóa giỏ hàng → cùng commit/rollback
+ * - Đảm bảo data consistency (không mất tiền, không mất đơn hàng)
+ *
+ * STATUS HISTORY:
+ * - Mỗi lần thay đổi trạng thái → ghi vào OrderStatusHistory
+ * - Ghi nhận: Previous status, New status, Admin note, Changed by (admin userId)
+ * - Audit trail đầy đủ để tracking
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+@Transactional // Tất cả methods chạy trong transaction
 public class OrderService {
 
     private final OrderRepository orderRepository;
@@ -48,9 +111,16 @@ public class OrderService {
     private final FeeCalculationService feeCalculationService;
 
     /**
-     * Infer currency from marketplace
-     * @param marketplace Marketplace enum
-     * @return Currency code (USD for ALIEXPRESS, CNY for ALIBABA1688)
+     * Suy ra loại tiền tệ từ marketplace
+     *
+     * Mỗi marketplace sử dụng tiền tệ riêng:
+     * - AliExpress: USD (Dollar Mỹ)
+     * - Alibaba 1688: CNY (Nhân dân tệ Trung Quốc)
+     *
+     * Method này dùng để convert giá sản phẩm sang VND khi tính tổng đơn hàng
+     *
+     * @param marketplace Marketplace enum (ALIEXPRESS hoặc ALIBABA1688)
+     * @return Currency code (USD hoặc CNY)
      */
     private String inferCurrency(Marketplace marketplace) {
         if (marketplace == null) {
@@ -67,10 +137,21 @@ public class OrderService {
     }
 
     /**
-     * Generate unique order number
+     * Tạo mã đơn hàng duy nhất (Order Number)
+     *
      * Format: ORD-{timestamp}-{random}
-     * Example: ORD-20231025143522-A3F9
-     * @return Unique order number
+     * - ORD: Prefix cố định
+     * - Timestamp: yyyyMMddHHmmss (14 chữ số)
+     * - Random: 4 ký tự hex ngẫu nhiên (0-9, A-F)
+     *
+     * Ví dụ: ORD-20231025143522-A3F9
+     * → Order tạo ngày 25/10/2023 lúc 14:35:22, random code A3F9
+     *
+     * UNIQUENESS CHECK:
+     * - Check database để đảm bảo không trùng (rất hiếm xảy ra)
+     * - Nếu trùng → generate lại random part
+     *
+     * @return Mã đơn hàng unique (String)
      */
     private String generateOrderNumber() {
         String timestamp = LocalDateTime.now()
@@ -90,10 +171,69 @@ public class OrderService {
     }
 
     /**
-     * Checkout - Create order from cart
-     * @param userId User ID
-     * @param request CheckoutRequest
-     * @return OrderResponse DTO
+     * Checkout - Tạo đơn hàng từ giỏ hàng
+     *
+     * Đây là method phức tạp nhất của OrderService, xử lý toàn bộ quy trình đặt hàng
+     *
+     * LUỒNG XỬ LÝ:
+     * 1. Validate input (địa chỉ, số điện thoại, format SĐT Việt Nam)
+     * 2. Kiểm tra user và giỏ hàng tồn tại
+     * 3. Filter items theo itemIds (nếu user chỉ checkout một phần giỏ hàng)
+     * 4. Tạo Order entity với mã đơn hàng unique
+     * 5. Copy cart items → order items
+     * 6. Tính tổng tiền sản phẩm (convert sang VND qua exchange rate)
+     * 7. Tính phí dịch vụ 1.5% (FeeCalculationService)
+     * 8. Tính deposit 70% và remaining 30%
+     * 9. Kiểm tra số dư ví và wallet lock status
+     * 10. Lưu order → Tạo wallet transaction → Trừ tiền ví
+     * 11. Xóa items đã checkout khỏi giỏ hàng
+     * 12. Trả về OrderResponse
+     *
+     * TÍNH TIỀN:
+     * - Product Cost = Tổng (item price x quantity) convert sang VND
+     * - Service Fee = Product Cost x 1.5%
+     * - Total Cost = Product Cost + Service Fee
+     * - Deposit (70%) = Total Cost x 70% (làm tròn)
+     * - Remaining (30%) = Total Cost - Deposit
+     *
+     * CONVERT TỶ GIÁ:
+     * - Lấy marketplace từ cart item → infer currency (USD/CNY)
+     * - Gọi ExchangeRateService để lấy rate → VND
+     * - Validate exchange rate phải > 0
+     * - Convert và làm tròn về số nguyên (HALF_UP)
+     *
+     * WALLET PAYMENT:
+     * - Check wallet locked → throw exception
+     * - Check balance đủ trả deposit → throw exception với số tiền thiếu
+     * - Save order TRƯỚC (để có order ID)
+     * - Tạo WalletTransaction với type ORDER_PAYMENT
+     * - Update wallet balance (atomic với transaction)
+     * - Nếu bất kỳ bước nào fail → rollback toàn bộ (@Transactional)
+     *
+     * XÓA GIỎ HÀNG:
+     * - Nếu có itemIds → chỉ xóa items đã checkout
+     * - Nếu không có itemIds → xóa toàn bộ giỏ hàng (backward compatibility)
+     *
+     * ERROR HANDLING:
+     * - IllegalArgumentException: Invalid input (address, phone)
+     * - UserNotFoundException: User không tồn tại
+     * - CartNotFoundException: User chưa có giỏ hàng
+     * - EmptyCartException: Giỏ hàng rỗng hoặc không có item nào được chọn
+     * - IllegalStateException: Wallet locked, insufficient balance, invalid exchange rate
+     *
+     * BẢO MẬT:
+     * - userId được truyền từ controller (đã extract từ JWT token)
+     * - Verify user tồn tại trước khi xử lý
+     * - User chỉ checkout giỏ hàng của chính mình (cart.userId == userId)
+     *
+     * @param userId User ID (từ JWT token, đã authenticated)
+     * @param request CheckoutRequest chứa: shipping address, phone, note, itemIds (optional)
+     * @return OrderResponse với đầy đủ thông tin đơn hàng và items
+     * @throws IllegalArgumentException nếu input không hợp lệ
+     * @throws UserNotFoundException nếu user không tồn tại
+     * @throws CartNotFoundException nếu giỏ hàng không tồn tại
+     * @throws EmptyCartException nếu giỏ hàng rỗng
+     * @throws IllegalStateException nếu wallet locked hoặc insufficient balance
      */
     public OrderResponse checkout(Long userId, CheckoutRequest request) {
         log.info("Processing checkout for user {}", userId);
@@ -287,10 +427,24 @@ public class OrderService {
     }
 
     /**
-     * Get all orders for user with pagination
-     * @param userId User ID
-     * @param pageable Pagination information
-     * @return Page of OrderResponse DTOs
+     * Lấy danh sách đơn hàng của user với phân trang
+     *
+     * User chỉ xem được đơn hàng của chính mình
+     * Đơn hàng được sắp xếp theo createdAt giảm dần (mới nhất trước)
+     *
+     * PAGINATION:
+     * - Pageable chứa: page number, page size, sort
+     * - Ví dụ: page=0, size=10 → lấy 10 đơn hàng đầu tiên
+     * - Return Page object với totalElements, totalPages, content[]
+     *
+     * RESPONSE FORMAT:
+     * - Dùng OrderResponse.toSummary() để tối ưu performance
+     * - Không load OrderItems trong summary list (chỉ load khi getOrderDetail)
+     *
+     * @param userId User ID (từ JWT token)
+     * @param pageable Thông tin phân trang (page, size, sort)
+     * @return Page<OrderResponse> với danh sách đơn hàng và metadata
+     * @throws UserNotFoundException nếu user không tồn tại
      */
     public Page<OrderResponse> getUserOrders(Long userId, Pageable pageable) {
         log.info("Getting orders for user {} with pagination", userId);
@@ -307,10 +461,19 @@ public class OrderService {
     }
 
     /**
-     * Get order detail by ID
-     * @param userId User ID (for security check)
-     * @param orderId Order ID
-     * @return OrderResponse DTO with items
+     * Lấy chi tiết đơn hàng theo ID
+     *
+     * Load đầy đủ thông tin đơn hàng bao gồm OrderItems
+     *
+     * BẢO MẬT:
+     * - Verify đơn hàng thuộc về user (order.userId == userId)
+     * - Nếu không match → throw OrderNotFoundException (giống như không tìm thấy)
+     * - Không expose thông tin "đơn hàng tồn tại nhưng không phải của bạn"
+     *
+     * @param userId User ID (từ JWT token, để verify ownership)
+     * @param orderId Order ID cần xem chi tiết
+     * @return OrderResponse với đầy đủ items
+     * @throws OrderNotFoundException nếu order không tồn tại hoặc không thuộc về user
      */
     public OrderResponse getOrderDetail(Long userId, Long orderId) {
         log.info("Getting order detail {} for user {}", orderId, userId);
@@ -329,11 +492,20 @@ public class OrderService {
     }
 
     /**
-     * Update order status
-     * @param userId User ID (for security check)
+     * Cập nhật trạng thái đơn hàng (User operation)
+     *
+     * User có quyền thay đổi trạng thái đơn hàng của chính mình (ít dùng)
+     * Thông thường user chỉ dùng cancelOrder() để hủy đơn
+     *
+     * BẢO MẬT:
+     * - Verify ownership trước khi cập nhật
+     * - User không thể thay đổi đơn hàng của người khác
+     *
+     * @param userId User ID (từ JWT token)
      * @param orderId Order ID
-     * @param newStatus New status
-     * @return OrderResponse DTO
+     * @param newStatus Trạng thái mới
+     * @return OrderResponse đã cập nhật
+     * @throws OrderNotFoundException nếu order không tồn tại hoặc không thuộc về user
      */
     public OrderResponse updateOrderStatus(Long userId, Long orderId, OrderStatus newStatus) {
         log.info("Updating order {} status to {} for user {}", orderId, newStatus, userId);
@@ -361,10 +533,46 @@ public class OrderService {
     }
 
     /**
-     * Cancel order (only if status is PENDING)
-     * @param userId User ID (for security check)
-     * @param orderId Order ID
-     * @return OrderResponse DTO
+     * Hủy đơn hàng và hoàn tiền về ví
+     *
+     * User chỉ có thể hủy đơn hàng ở trạng thái PENDING (chưa xác nhận)
+     *
+     * ĐIỀU KIỆN HỦY ĐƠN:
+     * - Order phải ở trạng thái PENDING
+     * - Order phải thuộc về user (security check)
+     * - Method này gọi order.isCancellable() để validate
+     *
+     * HOÀN TIỀN TỰ ĐỘNG:
+     * - Nếu user đã thanh toán deposit → hoàn tiền về ví
+     * - Cộng lại depositAmount vào wallet balance
+     * - Tạo WalletTransaction với type ORDER_REFUND
+     * - Transaction ghi nhận balance_before và balance_after
+     *
+     * LUỒNG XỬ LÝ:
+     * 1. Load order và verify ownership
+     * 2. Check order có thể hủy không (isCancellable)
+     * 3. Nếu đã thanh toán deposit:
+     *    - Load wallet của user
+     *    - Cộng tiền vào wallet (wallet.deposit())
+     *    - Save wallet
+     *    - Tạo refund transaction record
+     * 4. Set order status = CANCELLED
+     * 5. Save order và return response
+     *
+     * TRANSACTION:
+     * - Toàn bộ quá trình trong 1 transaction (@Transactional)
+     * - Nếu bất kỳ bước nào fail → rollback (không mất tiền, order không bị cancel)
+     *
+     * BẢO MẬT:
+     * - Verify ownership trước khi hủy
+     * - User chỉ hủy được đơn hàng của chính mình
+     * - Log warning nếu có attempt truy cập order của người khác
+     *
+     * @param userId User ID (từ JWT token)
+     * @param orderId Order ID cần hủy
+     * @return OrderResponse với status CANCELLED
+     * @throws OrderNotFoundException nếu order không tồn tại hoặc không thuộc về user
+     * @throws OrderNotCancellableException nếu order không thể hủy (status không phải PENDING)
      */
     public OrderResponse cancelOrder(Long userId, Long orderId) {
         log.info("Cancelling order {} for user {}", orderId, userId);
@@ -427,10 +635,15 @@ public class OrderService {
     }
 
     /**
-     * Get order by order number
-     * @param userId User ID (for security check)
-     * @param orderNumber Order number
-     * @return OrderResponse DTO
+     * Lấy đơn hàng theo mã đơn hàng (Order Number)
+     *
+     * Tương tự getOrderDetail nhưng tìm theo orderNumber thay vì orderId
+     * Hữu ích khi user muốn tra cứu đơn hàng bằng mã (ví dụ: ORD-20231025143522-A3F9)
+     *
+     * @param userId User ID (từ JWT token, để verify ownership)
+     * @param orderNumber Mã đơn hàng (ORD-xxxxx-xxxx)
+     * @return OrderResponse với đầy đủ thông tin
+     * @throws OrderNotFoundException nếu order không tồn tại hoặc không thuộc về user
      */
     public OrderResponse getOrderByNumber(Long userId, String orderNumber) {
         log.info("Getting order {} for user {}", orderNumber, userId);
@@ -449,10 +662,50 @@ public class OrderService {
     }
 
     /**
-     * Pay remaining amount (30% + fees) from wallet
-     * @param userId User ID (for security check)
-     * @param orderId Order ID
-     * @return OrderResponse DTO
+     * Thanh toán số tiền còn lại (30% + phí phát sinh) từ ví điện tử
+     *
+     * Được gọi sau khi admin cập nhật phí ship và phí dịch vụ thêm
+     * User cần thanh toán phần còn lại để hoàn tất đơn hàng
+     *
+     * KỊCH BẢN SỬ DỤNG:
+     * 1. User checkout → trả 70% deposit
+     * 2. Admin order hàng từ marketplace
+     * 3. Admin cập nhật phí ship thực tế và phí dịch vụ thêm (updateOrderFees)
+     * 4. System tính lại remainingAmount = total - deposit
+     * 5. User gọi API này để trả phần còn lại
+     * 6. Order chuyển sang WALLET_PAID hoặc FULLY_COMPLETED
+     *
+     * REMAINING AMOUNT BAO GỒM:
+     * - 30% giá trị sản phẩm ban đầu
+     * - Phí ship nội địa (domestic shipping fee)
+     * - Phí ship quốc tế (international shipping fee)
+     * - Phí dịch vụ thêm (additional services: đóng gỗ, bọc bong bóng, v.v.)
+     *
+     * ĐIỀU KIỆN THANH TOÁN:
+     * - Order chưa thanh toán hết (paymentStatus != WALLET_PAID/FULLY_COMPLETED)
+     * - remainingAmount > 0
+     * - Wallet không bị lock
+     * - Wallet balance đủ trả remainingAmount
+     *
+     * LUỒNG XỬ LÝ:
+     * 1. Load order và verify ownership
+     * 2. Check payment status (chưa thanh toán hết)
+     * 3. Check remainingAmount > 0
+     * 4. Load wallet và check locked/balance
+     * 5. Trừ tiền từ wallet (wallet.withdraw)
+     * 6. Tạo WalletTransaction với type ORDER_PAYMENT
+     * 7. Update order.paymentStatus = WALLET_PAID
+     * 8. Save và return OrderResponse
+     *
+     * TRANSACTION:
+     * - @Transactional: Atomic operation
+     * - Nếu fail → rollback (không mất tiền, payment status không đổi)
+     *
+     * @param userId User ID (từ JWT token)
+     * @param orderId Order ID cần thanh toán
+     * @return OrderResponse với payment status đã cập nhật
+     * @throws OrderNotFoundException nếu order không tồn tại hoặc không thuộc về user
+     * @throws IllegalStateException nếu đã thanh toán hết, không có remaining amount, wallet locked, hoặc insufficient balance
      */
     @Transactional
     public OrderResponse payRemainingAmount(Long userId, Long orderId) {
@@ -533,11 +786,30 @@ public class OrderService {
     // ==================== ADMIN METHODS ====================
 
     /**
-     * Get all orders with optional filters (admin operation)
-     * @param pageable Pagination information
-     * @param status Optional status filter
-     * @param userId Optional user ID filter
-     * @return Page of OrderResponse
+     * Lấy tất cả đơn hàng với filter tùy chọn (Admin operation)
+     *
+     * Admin/Staff có thể xem tất cả đơn hàng của tất cả user
+     * Hỗ trợ filter theo status và userId
+     *
+     * FILTER OPTIONS:
+     * - Không filter: Lấy tất cả đơn hàng
+     * - Filter theo status: Chỉ lấy đơn ở trạng thái cụ thể (PENDING, CONFIRMED, v.v.)
+     * - Filter theo userId: Chỉ lấy đơn của 1 user cụ thể
+     * - Combine cả 2: userId + status
+     *
+     * PAGINATION:
+     * - Pageable chứa page, size, sort
+     * - Đơn hàng sắp xếp theo createdAt giảm dần (mới nhất trước)
+     *
+     * USE CASE:
+     * - Admin dashboard: Xem tất cả đơn hàng pending để xử lý
+     * - Search orders: Tìm đơn hàng của user cụ thể
+     * - Reports: Thống kê đơn hàng theo status
+     *
+     * @param pageable Thông tin phân trang
+     * @param status (Optional) Filter theo order status
+     * @param userId (Optional) Filter theo user ID
+     * @return Page<OrderResponse> với danh sách đơn hàng
      */
     public Page<OrderResponse> getAllOrders(Pageable pageable, OrderStatus status, Long userId) {
         log.info("Admin getting all orders - status: {}, userId: {}", status, userId);
@@ -562,9 +834,14 @@ public class OrderService {
     }
 
     /**
-     * Get order by ID (admin operation - no user check)
+     * Lấy đơn hàng theo ID (Admin operation - không check ownership)
+     *
+     * Khác với getOrderDetail (user), method này KHÔNG kiểm tra ownership
+     * Admin có thể xem đơn hàng của bất kỳ user nào
+     *
      * @param orderId Order ID
-     * @return OrderResponse DTO
+     * @return OrderResponse với đầy đủ thông tin
+     * @throws OrderNotFoundException nếu order không tồn tại
      */
     public OrderResponse getOrderByIdAdmin(Long orderId) {
         log.info("Admin getting order {}", orderId);
@@ -576,11 +853,36 @@ public class OrderService {
     }
 
     /**
-     * Update order status (admin operation)
-     * Records status change in history with admin note
-     * @param orderId Order ID
-     * @param request UpdateOrderStatusRequest (status + optional note)
-     * @return Updated OrderResponse
+     * Cập nhật trạng thái đơn hàng (Admin operation)
+     *
+     * Admin có quyền thay đổi trạng thái đơn hàng của bất kỳ user nào
+     * Mỗi lần thay đổi trạng thái được ghi lại trong OrderStatusHistory
+     *
+     * STATUS HISTORY TRACKING:
+     * - Ghi nhận previous status và new status
+     * - Ghi nhận admin note (lý do thay đổi)
+     * - Ghi nhận changedBy (admin user ID từ JWT token)
+     * - Timestamp tự động (createdAt)
+     *
+     * AUTO PAYMENT STATUS UPDATE:
+     * - Nếu order → DELIVERED: set paymentStatus = FULLY_COMPLETED
+     * - Nếu order → CANCELLED: giữ nguyên payment status (refund xử lý riêng)
+     *
+     * VÒNG ĐỜI THÔNG THƯỜNG:
+     * 1. PENDING → CONFIRMED (admin xác nhận order)
+     * 2. CONFIRMED → PURCHASING (đang order từ marketplace)
+     * 3. PURCHASING → IN_TRANSIT (hàng đang ship)
+     * 4. IN_TRANSIT → DELIVERED (giao hàng thành công)
+     * 5. Có thể CANCELLED ở bất kỳ bước nào
+     *
+     * BUSINESS RULES:
+     * - Admin có thể chuyển sang bất kỳ status nào (không validate transition)
+     * - Có thể thêm business rules nếu cần (ví dụ: không cho phép DELIVERED → PENDING)
+     *
+     * @param orderId Order ID cần cập nhật
+     * @param request UpdateOrderStatusRequest chứa: status (bắt buộc), note (optional)
+     * @return OrderResponse đã cập nhật với status history
+     * @throws OrderNotFoundException nếu order không tồn tại
      */
     public OrderResponse updateOrderStatusAdmin(Long orderId, UpdateOrderStatusRequest request) {
         log.info("Admin updating order {} status to {} with note: {}",
@@ -627,11 +929,61 @@ public class OrderService {
     }
 
     /**
-     * Update order fees (admin/staff operation)
-     * Updates shipping fees and calculates additional services fees
-     * @param orderId Order ID
-     * @param request UpdateOrderFeesRequest
-     * @return Updated OrderResponse
+     * Cập nhật phí đơn hàng (Admin/Staff operation)
+     *
+     * Admin/Staff cập nhật phí ship thực tế và phí dịch vụ thêm sau khi order từ marketplace
+     * Method này tính toán lại tổng chi phí và remaining amount
+     *
+     * ĐIỀU KIỆN CẬP NHẬT PHÍ:
+     * - Order phải ở trạng thái CONFIRMED
+     * - Chỉ admin/staff mới có quyền cập nhật
+     *
+     * CÁC LOẠI PHÍ CÓ THỂ CẬP NHẬT:
+     * 1. Domestic Shipping Fee (phí ship nội địa):
+     *    - Admin nhập bằng CNY
+     *    - System tự động convert CNY → VND qua ExchangeRateService
+     *
+     * 2. International Shipping Fee (phí ship quốc tế):
+     *    - Admin nhập bằng VND (không cần convert)
+     *
+     * 3. Estimated Weight (cân nặng ước tính):
+     *    - Dùng để tính phí dịch vụ thêm
+     *
+     * 4. Additional Services:
+     *    - Wooden Packaging (đóng gỗ): ✓/✗
+     *    - Bubble Wrap (bọc bong bóng): ✓/✗
+     *    - Item Count Check (đếm hàng): ✓/✗
+     *    - FeeCalculationService tự động tính phí dựa trên services được chọn
+     *
+     * TÍNH LẠI TỔNG CHI PHÍ:
+     * - Product Cost (giá sản phẩm - đã tính khi checkout)
+     * - Service Fee (1.5% - đã tính khi checkout)
+     * - Domestic Shipping Fee (phí ship nội địa - mới cập nhật)
+     * - International Shipping Fee (phí ship quốc tế - mới cập nhật)
+     * - Additional Services Fee (phí dịch vụ thêm - tính dựa trên options)
+     * → Total Amount = tổng tất cả phí trên
+     * → Remaining Amount = Total - Deposit (đã trả 70%)
+     *
+     * LUỒNG XỬ LÝ:
+     * 1. Load order và check status = CONFIRMED
+     * 2. Cập nhật domestic shipping fee (convert CNY → VND)
+     * 3. Cập nhật international shipping fee
+     * 4. Cập nhật estimated weight
+     * 5. Tính additional services fee (FeeCalculationService)
+     * 6. Tính lại total amount
+     * 7. Tính lại remaining amount (total - deposit)
+     * 8. Thêm admin note vào order note (nếu có)
+     * 9. Save order và return response
+     *
+     * SAU KHI CẬP NHẬT PHÍ:
+     * - User có thể xem remaining amount mới
+     * - User gọi payRemainingAmount() để thanh toán phần còn lại
+     *
+     * @param orderId Order ID cần cập nhật phí
+     * @param request UpdateOrderFeesRequest chứa: domestic fee, international fee, weight, services, note
+     * @return OrderResponse với phí đã cập nhật
+     * @throws OrderNotFoundException nếu order không tồn tại
+     * @throws IllegalStateException nếu order không ở trạng thái CONFIRMED
      */
     public OrderResponse updateOrderFees(Long orderId, UpdateOrderFeesRequest request) {
         log.info("Admin/staff updating order {} fees", orderId);
@@ -720,12 +1072,37 @@ public class OrderService {
     }
 
     /**
-     * Update order shipping address (User operation)
-     * Users can only update address when order is PENDING
-     * @param userId User ID (from JWT token)
-     * @param orderId Order ID
-     * @param request UpdateOrderAddressRequest
-     * @return Updated OrderResponse
+     * Cập nhật địa chỉ giao hàng (User operation)
+     *
+     * User có thể thay đổi địa chỉ và số điện thoại khi đơn hàng chưa được xác nhận
+     *
+     * ĐIỀU KIỆN THAY ĐỔI:
+     * - Order phải thuộc về user (ownership check)
+     * - Order phải ở trạng thái PENDING (chưa xác nhận)
+     * - Nếu đã CONFIRMED hoặc muộn hơn → không cho phép thay đổi
+     *
+     * USE CASE:
+     * - User vừa checkout xong, phát hiện sai địa chỉ
+     * - User muốn giao hàng đến địa chỉ khác
+     * - Admin chưa xác nhận đơn → user còn có thể sửa
+     *
+     * LUỒNG XỬ LÝ:
+     * 1. Load order và verify ownership
+     * 2. Check status = PENDING (nếu không → throw exception)
+     * 3. Update shippingAddress và phone
+     * 4. Thêm note ghi nhận thay đổi (nếu user cung cấp note)
+     * 5. Save và return OrderResponse
+     *
+     * BẢO MẬT:
+     * - Verify ownership (order.userId == userId)
+     * - User chỉ sửa được đơn hàng của chính mình
+     *
+     * @param userId User ID (từ JWT token)
+     * @param orderId Order ID cần sửa
+     * @param request UpdateOrderAddressRequest chứa: shippingAddress, phone, note (optional)
+     * @return OrderResponse đã cập nhật
+     * @throws IllegalArgumentException nếu không phải đơn hàng của user
+     * @throws IllegalStateException nếu order không ở trạng thái PENDING
      */
     public OrderResponse updateOrderAddress(Long userId, Long orderId, UpdateOrderAddressRequest request) {
         log.info("User {} updating order {} address", userId, orderId);
@@ -763,11 +1140,30 @@ public class OrderService {
     }
 
     /**
-     * Update order shipping address (Admin/Staff operation)
-     * Admin/Staff can update address when order is PENDING or CONFIRMED
-     * @param orderId Order ID
-     * @param request UpdateOrderAddressRequest
-     * @return Updated OrderResponse
+     * Cập nhật địa chỉ giao hàng (Admin/Staff operation)
+     *
+     * Admin/Staff có thể thay đổi địa chỉ giao hàng khi đơn hàng ở PENDING hoặc CONFIRMED
+     * Linh hoạt hơn user operation (user chỉ sửa được khi PENDING)
+     *
+     * ĐIỀU KIỆN THAY ĐỔI:
+     * - Order ở trạng thái PENDING hoặc CONFIRMED
+     * - Không check ownership (admin có thể sửa đơn hàng bất kỳ)
+     *
+     * USE CASE:
+     * - User liên hệ admin để đổi địa chỉ sau khi admin đã xác nhận đơn
+     * - Admin phát hiện sai sót trong địa chỉ cần sửa lại
+     * - Địa chỉ không hợp lệ, admin cần xác nhận lại với user
+     *
+     * PHÂN BIỆT VỚI USER OPERATION:
+     * - User: Chỉ sửa được khi PENDING
+     * - Admin: Sửa được khi PENDING hoặc CONFIRMED
+     * - Note có prefix "[Admin/Staff đã thay đổi địa chỉ]" để phân biệt
+     *
+     * @param orderId Order ID cần sửa
+     * @param request UpdateOrderAddressRequest chứa: shippingAddress, phone, note (optional)
+     * @return OrderResponse đã cập nhật
+     * @throws OrderNotFoundException nếu order không tồn tại
+     * @throws IllegalStateException nếu order không ở trạng thái PENDING hoặc CONFIRMED
      */
     public OrderResponse updateOrderAddressAdmin(Long orderId, UpdateOrderAddressRequest request) {
         log.info("Admin/staff updating order {} address", orderId);
