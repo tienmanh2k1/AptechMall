@@ -30,50 +30,143 @@ import TransactionHistoryPage from './features/wallet/pages/TransactionHistoryPa
 import ProfilePage from './features/user/pages/ProfilePage';
 import AddressManagementPage from './features/user/pages/AddressManagementPage';
 
+// 🏠 Trang chủ (thiết kế chuyên nghiệp)
 const HomePage = () => (
-  <div className="container mx-auto px-4 py-16 text-center">
-    <h1 className="text-4xl font-bold mb-4">Chào mừng đến với AptechMall</h1>
-    <p className="text-gray-600 mb-8">Nền tảng mua sắm trực tuyến uy tín</p>
-    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <Link
-        to="/search"
-        className="inline-block px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-      >
-        Tìm kiếm sản phẩm
-      </Link>
-      <Link
-        to="/aliexpress/products/1005005244562338"
-        className="inline-block px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-      >
-        Xem sản phẩm mẫu
-      </Link>
-    </div>
+  <div className="bg-white text-gray-800">
+    {/* HERO SECTION */}
+    <section className="min-h-[80vh] flex flex-col justify-center items-center text-center px-6 py-20 bg-gradient-to-b from-[#fff5f5] to-white">
+      <h1 className="text-5xl sm:text-6xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-[#FF3B30] to-[#FF6F61] leading-tight">
+        Mua Sắm Thông Minh, Sống Tốt Hơn
+      </h1>
+      <p className="text-lg text-gray-600 mb-8 max-w-2xl">
+        AptechMall kết nối bạn với các nhà bán hàng toàn cầu uy tín và sản phẩm
+        chất lượng cao cho mọi phong cách sống. Khám phá chất lượng, tiện nghi và giá trị tốt nhất.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Link
+          to="/search"
+          className="px-8 py-3 bg-[#FF3B30] text-white rounded-full font-semibold hover:scale-105 shadow-md hover:shadow-lg transition-all"
+        >
+          🛍️ Khám Phá Sản Phẩm
+        </Link>
+        <Link
+          to="/register"
+          className="px-8 py-3 bg-white border border-gray-300 text-gray-700 rounded-full font-semibold hover:bg-gray-50 hover:scale-105 transition-all"
+        >
+          ✨ Bắt Đầu Ngay
+        </Link>
+      </div>
+    </section>
 
-    {/* Admin Login Link */}
-    <div className="mt-12 pt-8 border-t border-gray-200">
-      <p className="text-sm text-gray-500 mb-4">Bạn là quản trị viên hoặc nhân viên?</p>
+    {/* WHY CHOOSE US */}
+    <section className="py-20 px-6 bg-white text-center">
+      <h2 className="text-3xl font-bold mb-12">Tại Sao Khách Hàng Yêu Thích AptechMall</h2>
+      <div className="grid sm:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {[
+          {
+            title: "Giao Hàng Nhanh & An Toàn",
+            desc: "Vận chuyển có theo dõi và đóng gói cẩn thận để bạn an tâm.",
+            icon: "🚚",
+          },
+          {
+            title: "Thương Hiệu Toàn Cầu Uy Tín",
+            desc: "Khám phá sản phẩm chất lượng cao từ các nhà bán hàng đáng tin cậy trên toàn thế giới.",
+            icon: "🌏",
+          },
+          {
+            title: "Chính Sách Ưu Tiên Khách Hàng",
+            desc: "Hoàn tiền, đổi trả và hỗ trợ nhanh chóng bất cứ khi nào bạn cần.",
+            icon: "🤝",
+          },
+        ].map((item, i) => (
+          <div
+            key={i}
+            className="p-8 rounded-2xl border border-gray-100 hover:border-[#FF3B30]/30 shadow-sm hover:shadow-md transition-all"
+          >
+            <div className="text-4xl mb-4">{item.icon}</div>
+            <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
+            <p className="text-gray-600 text-sm">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+
+    {/* CUSTOMER REVIEWS */}
+    <section className="py-20 px-6 bg-white text-center">
+      <h2 className="text-3xl font-bold mb-8 text-gray-800">
+        Khách Hàng Nói Gì Về Chúng Tôi
+      </h2>
+      <div className="grid sm:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        {[
+          {
+            name: "Emily Nguyễn",
+            text: "Tôi đã tìm được đúng thứ mình muốn với giá cả hợp lý. Giao hàng rất nhanh!",
+            avatar: "https://randomuser.me/api/portraits/women/79.jpg",
+          },
+          {
+            name: "David Trần",
+            text: "Trải nghiệm mượt mà và người bán đáng tin cậy. Sẽ quay lại mua hàng!",
+            avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+          },
+          {
+            name: "Linh Phạm",
+            text: "Hỗ trợ khách hàng rất nhanh chóng và nhiệt tình!",
+            avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+          },
+        ].map((r, i) => (
+          <div
+            key={i}
+            className="p-6 bg-[#fff8f8] rounded-2xl shadow-sm hover:shadow-md transition-all"
+          >
+            <img
+              src={r.avatar}
+              alt={r.name}
+              className="w-16 h-16 rounded-full mx-auto mb-4 object-cover"
+            />
+            <p className="text-gray-600 italic mb-3">"{r.text}"</p>
+            <h4 className="text-gray-800 font-semibold">{r.name}</h4>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    {/* CALL TO ACTION */}
+    <section className="py-16 bg-[#FF3B30] text-white text-center">
+      <h2 className="text-3xl font-bold mb-4">Bắt Đầu Mua Sắm Thông Minh Ngay Hôm Nay!</h2>
+      <p className="text-white/90 mb-8">
+        Tham gia cùng hàng nghìn khách hàng hài lòng tin tưởng AptechMall.
+      </p>
       <Link
-        to="/admin/login"
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+        to="/register"
+        className="bg-white text-[#FF3B30] px-8 py-3 rounded-full font-semibold hover:bg-gray-100 transition-colors"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-        Cổng quản trị
+        Tạo Tài Khoản →
       </Link>
-    </div>
+    </section>
+
   </div>
 );
 
+// 404 PAGE
 const NotFoundPage = () => (
-  <div className="container mx-auto px-4 py-16 text-center">
-    <h1 className="text-4xl font-bold mb-4">404 - Không tìm thấy trang</h1>
-    <p className="text-gray-600 mb-8">Trang bạn đang tìm kiếm không tồn tại.</p>
+  <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6">
+    <img
+      src="https://illustrations.popsy.co/gray/error-404.svg"
+      alt="404"
+      className="w-72 mb-6 opacity-90"
+    />
+    <h1 className="text-4xl font-bold text-gray-800 mb-3">
+      Oops! Không Tìm Thấy Trang
+    </h1>
+    <p className="text-gray-600 mb-6 max-w-sm">
+      Trang bạn đang tìm kiếm không tồn tại hoặc đã được di chuyển.
+    </p>
     <Link
       to="/"
-      className="inline-block px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+      className="px-6 py-3 bg-[#FF3B30] text-white rounded-full font-medium hover:bg-[#ff564d] transition-colors"
     >
-      Về trang chủ
+      Về Trang Chủ
     </Link>
   </div>
 );

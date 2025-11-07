@@ -59,19 +59,19 @@ public class AuthService {
                     .build();
 
         } catch (ExpiredJwtException e) {
-            System.err.println("JWT expired: " + e.getMessage());
+            log.warn("JWT expired: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return null;
         } catch (JwtException e) {
-            System.err.println("Invalid JWT: " + e.getMessage());
+            log.warn("Invalid JWT: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return null;
         } catch (UsernameNotFoundException e) {
-            System.err.println("User not found: " + e.getMessage());
+            log.warn("User not found: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
         } catch (Exception e) {
-            System.err.println("Unexpected error in getProfile: " + e.getMessage());
+            log.error("Unexpected error in getProfile: {}", e.getMessage(), e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return null;
         }
@@ -109,19 +109,19 @@ public class AuthService {
                     .build();
 
         } catch (ExpiredJwtException e) {
-            System.err.println("JWT expired: " + e.getMessage());
+            log.warn("JWT expired: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return null;
         } catch (JwtException e) {
-            System.err.println("Invalid JWT: " + e.getMessage());
+            log.warn("Invalid JWT: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return null;
         } catch (UsernameNotFoundException e) {
-            System.err.println("User not found: " + e.getMessage());
+            log.warn("User not found: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
         } catch (Exception e) {
-            System.err.println("Unexpected error in getProfile: " + e.getMessage());
+            log.error("Unexpected error in getProfile: {}", e.getMessage(), e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return null;
         }
@@ -130,6 +130,13 @@ public class AuthService {
     public RegisterResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new UsernameAlreadyTaken("Username " +request.getUsername() + " already taken");
+        }
+
+        // Validate Vietnam phone number if provided
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            if (!isValidVietnamPhone(request.getPhone())) {
+                throw new IllegalArgumentException("Số điện thoại không hợp lệ. Phải là số điện thoại Việt Nam (10 số, đầu số hợp lệ)");
+            }
         }
 
         // Set default role to CUSTOMER if not provided or use provided role
@@ -143,6 +150,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .email(request.getEmail())
+                .phone(request.getPhone())
                 .build();
 
         userRepository.save(user);
@@ -295,11 +303,57 @@ public class AuthService {
             setCookieAttribute(response, refreshTokenCookie);
 
         } catch (Exception e) {
-            System.err.println("Error extracting subject from JWT: " + e.getMessage());
+            log.error("Error extracting subject from JWT: {}", e.getMessage(), e);
         }
     }
 
     // Old updateEmailOrPassword method removed - replaced by:
     // - UserProfileService.changePassword()
     // - UserProfileService.changeEmail()
+
+    /**
+     * Validate Vietnam phone number
+     * Must be exactly 10 digits and start with valid prefix
+     */
+    private boolean isValidVietnamPhone(String phone) {
+        if (phone == null || phone.trim().isEmpty()) {
+            return true; // Optional field
+        }
+
+        // Remove all non-digit characters
+        String cleanPhone = phone.replaceAll("\\D", "");
+
+        // Must be exactly 10 digits
+        if (cleanPhone.length() != 10) {
+            return false;
+        }
+
+        // Must start with 0
+        if (!cleanPhone.startsWith("0")) {
+            return false;
+        }
+
+        // Valid Vietnam phone prefixes (first 3 digits)
+        String[] validPrefixes = {
+                // Viettel
+                "032", "033", "034", "035", "036", "037", "038", "039", "096", "097", "098", "086",
+                // Vinaphone
+                "083", "084", "085", "081", "082", "088", "091", "094",
+                // Mobifone
+                "070", "079", "077", "076", "078", "090", "093", "089",
+                // Vietnamobile
+                "056", "058", "092",
+                // Gmobile
+                "059", "099"
+        };
+
+        String prefix = cleanPhone.substring(0, 3);
+        for (String validPrefix : validPrefixes) {
+            if (prefix.equals(validPrefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

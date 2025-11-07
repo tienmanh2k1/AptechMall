@@ -56,6 +56,25 @@ public class UserManagementService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // Prevent admin from changing their own role
+        Long currentUserId = AuthenticationUtil.getCurrentUserId();
+        if (id.equals(currentUserId) && updates.containsKey("role")) {
+            throw new RuntimeException("You cannot change your own role");
+        }
+
+        // Prevent last admin demotion
+        if (updates.containsKey("role")) {
+            String newRoleStr = (String) updates.get("role");
+            Role newRole = Role.valueOf(newRoleStr);
+
+            if (user.getRole() == Role.ADMIN && newRole != Role.ADMIN) {
+                long adminCount = userRepository.countByRole(Role.ADMIN);
+                if (adminCount <= 1) {
+                    throw new RuntimeException("Cannot demote the last admin account");
+                }
+            }
+        }
+
         updates.forEach((key, value) -> {
             switch (key) {
                 case "email" -> user.setEmail((String) value);
@@ -71,6 +90,28 @@ public class UserManagementService {
     }
 
     public UserResponseDTO updateUser(Long id, UserUpdateDTO dto) {
+        // Prevent admin from changing their own role
+        Long currentUserId = AuthenticationUtil.getCurrentUserId();
+        if (id.equals(currentUserId) && dto.getRole() != null) {
+            User currentUser = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new RuntimeException("Current user not found"));
+            if (!dto.getRole().equals(currentUser.getRole())) {
+                throw new RuntimeException("You cannot change your own role");
+            }
+        }
+
+        // Prevent last admin demotion
+        if (dto.getRole() != null) {
+            User userToUpdate = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+            if (userToUpdate.getRole() == Role.ADMIN && dto.getRole() != Role.ADMIN) {
+                long adminCount = userRepository.countByRole(Role.ADMIN);
+                if (adminCount <= 1) {
+                    throw new RuntimeException("Cannot demote the last admin account");
+                }
+            }
+        }
+
         return userRepository.findById(id)
                 .map(existingUser -> {
                     if (dto.getFullName() != null) existingUser.setFullName(dto.getFullName());

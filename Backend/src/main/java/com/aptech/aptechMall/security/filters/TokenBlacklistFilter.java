@@ -6,12 +6,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TokenBlacklistFilter extends OncePerRequestFilter {
@@ -36,13 +38,14 @@ public class TokenBlacklistFilter extends OncePerRequestFilter {
         if(token != null) {
             try {
                 if(redisService.hasToken(token.substring(7))) {
+                    
                     response.getWriter().write("Token is blacklisted");
                     response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token is blacklisted");
                     return;
                 }
             } catch (Exception e) {
                 // Redis not available - log warning but continue
-                System.err.println("WARNING: Redis not available for token blacklist check: " + e.getMessage());
+                log.warn("Redis not available for token blacklist check: {}", e.getMessage());
                 // Continue without blacklist check
             }
         }

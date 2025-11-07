@@ -341,10 +341,17 @@ const AdminUserManagementPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
-                          <Shield className="w-3 h-3 mr-1" />
-                          {user.role}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
+                            <Shield className="w-3 h-3 mr-1" />
+                            {user.role}
+                          </span>
+                          {user.userId === currentUser?.userId && (
+                            <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              You
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(user.status)}`}>
@@ -477,12 +484,19 @@ const AdminUserManagementPage = () => {
                     name="role"
                     value={formData.role}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={editingUser?.userId === currentUser?.userId}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   >
                     <option value="CUSTOMER">Customer</option>
                     <option value="STAFF">Staff</option>
                     <option value="ADMIN">Admin</option>
                   </select>
+                  {editingUser?.userId === currentUser?.userId && (
+                    <p className="mt-1 text-sm text-amber-600 flex items-center gap-1">
+                      <span>⚠️</span>
+                      <span>You cannot change your own role. Ask another admin to change it.</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Status */}

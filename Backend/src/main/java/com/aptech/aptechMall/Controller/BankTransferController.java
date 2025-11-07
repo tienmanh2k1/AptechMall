@@ -53,17 +53,19 @@ public class BankTransferController {
                     log.debug("Content-Type: {}", contentType);
 
                     if (contentType != null && contentType.contains("application/json")) {
-                        // Read JSON body
-                        java.io.BufferedReader reader = request.getReader();
-                        StringBuilder body = new StringBuilder();
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            body.append(line);
+                        // Read JSON body with try-with-resources to ensure proper resource cleanup
+                        String bodyStr;
+                        try (java.io.BufferedReader reader = request.getReader()) {
+                            StringBuilder body = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                body.append(line);
+                            }
+                            bodyStr = body.toString();
+                            log.debug("Request body: {}", bodyStr);
                         }
-                        log.debug("Request body: {}", body.toString());
 
                         // Parse JSON manually (simple parsing)
-                        String bodyStr = body.toString();
 
                         // Try standard keys first
                         if (bodyStr.contains("sender")) {

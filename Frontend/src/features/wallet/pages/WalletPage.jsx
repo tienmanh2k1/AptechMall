@@ -4,7 +4,7 @@ import { Wallet, RefreshCw, History, AlertCircle, ArrowDownCircle } from 'lucide
 import { getWallet } from '../services/walletApi';
 
 /**
- * Wallet Page
+ * Wallet Page (Trang Ví Điện Tử)
  * Main wallet dashboard showing balance and deposit options
  */
 const WalletPage = () => {
@@ -22,7 +22,7 @@ const WalletPage = () => {
       setWallet(response.data);
     } catch (err) {
       console.error('Error loading wallet:', err);
-      setError(err.response?.data?.message || 'Failed to load wallet');
+      setError(err.response?.data?.message || 'Không thể tải thông tin ví');
     } finally {
       setLoading(false);
     }
@@ -45,7 +45,7 @@ const WalletPage = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-2" />
-          <p className="text-gray-600">Loading wallet...</p>
+          <p className="text-gray-600">Đang tải thông tin ví...</p>
         </div>
       </div>
     );
@@ -56,13 +56,13 @@ const WalletPage = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-md p-6 max-w-md">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 text-center mb-2">Error</h2>
+          <h2 className="text-xl font-bold text-gray-800 text-center mb-2">Lỗi</h2>
           <p className="text-gray-600 text-center mb-4">{error}</p>
           <button
             onClick={loadWallet}
             className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition"
           >
-            Retry
+            Thử Lại
           </button>
         </div>
       </div>
@@ -76,14 +76,14 @@ const WalletPage = () => {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Wallet className="w-8 h-8" />
-            My Wallet
+            Ví Của Tôi
           </h1>
           <button
             onClick={loadWallet}
             className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow hover:shadow-md transition"
           >
             <RefreshCw className="w-4 h-4" />
-            Refresh
+            Làm Mới
           </button>
         </div>
 
@@ -91,7 +91,7 @@ const WalletPage = () => {
         <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-xl p-8 mb-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-blue-100 text-sm mb-1">Available Balance</p>
+              <p className="text-blue-100 text-sm mb-1">Số Dư Khả Dụng</p>
               <h2 className="text-4xl font-bold">
                 {formatCurrency(wallet?.balance)}
               </h2>
@@ -103,15 +103,15 @@ const WalletPage = () => {
             <div className="bg-red-500 bg-opacity-30 border border-red-300 rounded-lg p-3 mt-4">
               <p className="text-sm font-medium flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
-                Wallet is locked. Contact support for assistance.
+                Ví đã bị khóa. Liên hệ hỗ trợ để được trợ giúp.
               </p>
             </div>
           )}
 
           <div className="flex gap-2 text-xs text-blue-100 mt-4">
-            <span>Wallet ID: {wallet?.walletId}</span>
+            <span>Mã Ví: {wallet?.walletId}</span>
             <span>•</span>
-            <span>Created: {new Date(wallet?.createdAt).toLocaleDateString('vi-VN')}</span>
+            <span>Tạo lúc: {new Date(wallet?.createdAt).toLocaleDateString('vi-VN')}</span>
           </div>
         </div>
 
@@ -124,9 +124,9 @@ const WalletPage = () => {
             className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-left"
           >
             <ArrowDownCircle className="w-10 h-10 text-green-500 mb-3" />
-            <h3 className="text-lg font-bold text-gray-800 mb-1">Bank Transfer</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Chuyển Khoản Ngân Hàng</h3>
             <p className="text-sm text-gray-600">
-              Deposit via bank transfer with SMS verification
+              Nạp tiền qua chuyển khoản với xác thực SMS
             </p>
           </button>
 
@@ -136,9 +136,9 @@ const WalletPage = () => {
             className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition text-left"
           >
             <History className="w-10 h-10 text-blue-500 mb-3" />
-            <h3 className="text-lg font-bold text-gray-800 mb-1">Transaction History</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Lịch Sử Giao Dịch</h3>
             <p className="text-sm text-gray-600">
-              View all your wallet transactions
+              Xem tất cả giao dịch ví của bạn
             </p>
           </button>
         </div>
@@ -147,14 +147,14 @@ const WalletPage = () => {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
-            How to deposit
+            Hướng dẫn nạp tiền
           </h4>
           <ul className="text-sm text-blue-700 space-y-1 ml-6 list-disc">
-            <li>Click "Bank Transfer" to see bank account details</li>
-            <li>Transfer money from your bank to our account</li>
-            <li>Include your email in transfer note or scan QR code</li>
-            <li>SMS from bank will be processed automatically</li>
-            <li>Balance updates within 1-2 minutes</li>
+            <li>Nhấn "Chuyển Khoản Ngân Hàng" để xem thông tin tài khoản</li>
+            <li>Chuyển tiền từ ngân hàng của bạn đến tài khoản của chúng tôi</li>
+            <li>Ghi email của bạn vào nội dung chuyển khoản hoặc quét mã QR</li>
+            <li>SMS từ ngân hàng sẽ được xử lý tự động</li>
+            <li>Số dư cập nhật trong vòng 1-2 phút</li>
           </ul>
         </div>
       </div>

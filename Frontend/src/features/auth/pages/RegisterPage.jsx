@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { UserPlus, Mail, Lock, User, Eye, EyeOff, AtSign } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, Eye, EyeOff, AtSign, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { register as registerApi, login as loginApi } from '../services';
 
@@ -9,10 +9,25 @@ const RegisterPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  // Valid Vietnam phone number prefixes (10 digits total)
+  const vnPhonePrefixes = [
+    // Viettel
+    '032', '033', '034', '035', '036', '037', '038', '039', '096', '097', '098', '086',
+    // Vinaphone
+    '083', '084', '085', '081', '082', '088', '091', '094',
+    // Mobifone
+    '070', '079', '077', '076', '078', '090', '093', '089',
+    // Vietnamobile
+    '056', '058', '092',
+    // Gmobile
+    '059', '099'
+  ];
+
   const [formData, setFormData] = useState({
     username: '',
     fullName: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
   });
@@ -20,6 +35,28 @@ const RegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // Validate Vietnam phone number
+  const validateVNPhone = (phone) => {
+    if (!phone) return true; // Optional field
+
+    // Remove all non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '');
+
+    // Check if exactly 10 digits
+    if (cleanPhone.length !== 10) {
+      return false;
+    }
+
+    // Check if starts with 0
+    if (!cleanPhone.startsWith('0')) {
+      return false;
+    }
+
+    // Check if first 3 digits match valid prefixes
+    const prefix = cleanPhone.substring(0, 3);
+    return vnPhonePrefixes.includes(prefix);
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -45,6 +82,18 @@ const RegisterPage = () => {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
+    }
+
+    // Phone validation (optional but must be valid VN phone if provided)
+    if (formData.phone && !validateVNPhone(formData.phone)) {
+      const cleanPhone = formData.phone.replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        newErrors.phone = 'Số điện thoại phải có đúng 10 chữ số';
+      } else if (!cleanPhone.startsWith('0')) {
+        newErrors.phone = 'Số điện thoại phải bắt đầu bằng số 0';
+      } else {
+        newErrors.phone = 'Đầu số không hợp lệ. Vui lòng nhập đầu số của Viettel, Vinaphone, Mobifone, Vietnamobile hoặc Gmobile';
+      }
     }
 
     // Password validation
@@ -97,6 +146,7 @@ const RegisterPage = () => {
         username: formData.username,   // REQUIRED
         fullName: formData.fullName,   // REQUIRED (not "name")
         email: formData.email,         // REQUIRED
+        phone: formData.phone,         // OPTIONAL
         password: formData.password,   // REQUIRED
         role: 'CUSTOMER'              // Default role
       });
@@ -243,6 +293,34 @@ const RegisterPage = () => {
                 />
               </div>
               {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+            </div>
+
+            {/* Phone Field */}
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                Số điện thoại <span className="text-gray-400 text-xs">(Không bắt buộc)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className={`block w-full pl-10 pr-3 py-3 border ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
+                  placeholder="0123 456 789"
+                />
+              </div>
+              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
+              <p className="mt-1 text-xs text-gray-500">
+                Ví dụ: 0912345678, 0987654321 (10 số, đầu số Viettel, Vinaphone, Mobifone...)
+              </p>
             </div>
 
             {/* Password Field */}

@@ -70,8 +70,17 @@ public class BankSmsParserService {
                      amount, reference, username, userId, email);
             return true;
 
-        } catch (Exception e) {
-            log.error("Error parsing SMS: {}", e.getMessage(), e);
+        } catch (NumberFormatException e) {
+            log.error("Error parsing amount from SMS: {}", e.getMessage());
+            sms.setError("Invalid number format: " + e.getMessage());
+            return false;
+        } catch (java.util.regex.PatternSyntaxException e) {
+            log.error("Error in regex pattern: {}", e.getMessage(), e);
+            sms.setError("Regex pattern error: " + e.getMessage());
+            return false;
+        } catch (RuntimeException e) {
+            // Catch other runtime exceptions (e.g., NullPointerException, IllegalArgumentException)
+            log.error("Runtime error parsing SMS: {}", e.getMessage(), e);
             sms.setError("Parse error: " + e.getMessage());
             return false;
         }

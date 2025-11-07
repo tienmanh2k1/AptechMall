@@ -100,10 +100,16 @@ public class JwtService {
     public Long extractUserId(String token) {
         Claims claims = extractAllClaims(token);
         Object userIdObj = claims.get("userId");
-        if (userIdObj instanceof Number) {
-            return ((Number) userIdObj).longValue();
+
+        if (userIdObj == null) {
+            throw new IllegalStateException("User ID not found in JWT token. Please re-authenticate to get a new token.");
         }
-        return null;
+
+        if (!(userIdObj instanceof Number)) {
+            throw new IllegalStateException("Invalid userId format in JWT token: expected Number, got " + userIdObj.getClass().getSimpleName());
+        }
+
+        return ((Number) userIdObj).longValue();
     }
 
     private <T> T extractClaim(String token, Function<Claims, T> claimResolver) {

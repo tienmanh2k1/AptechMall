@@ -98,6 +98,23 @@ public class OrderService {
     public OrderResponse checkout(Long userId, CheckoutRequest request) {
         log.info("Processing checkout for user {}", userId);
 
+        // Validate input parameters (defense in depth - controller has @Valid but service layer should also validate)
+        if (request == null) {
+            throw new IllegalArgumentException("Checkout request cannot be null");
+        }
+        if (request.getShippingAddress() == null || request.getShippingAddress().trim().isEmpty()) {
+            throw new IllegalArgumentException("Shipping address is required");
+        }
+        if (request.getPhone() == null || request.getPhone().trim().isEmpty()) {
+            throw new IllegalArgumentException("Phone number is required");
+        }
+
+        // Validate Vietnam phone number format (10 digits, starts with 0)
+        String cleanPhone = request.getPhone().replaceAll("\\D", "");
+        if (cleanPhone.length() != 10 || !cleanPhone.startsWith("0")) {
+            throw new IllegalArgumentException("Invalid phone number format. Must be a valid Vietnam phone number (10 digits, starts with 0)");
+        }
+
         // Verify user exists
         if (!userRepository.existsById(userId)) {
             throw new UserNotFoundException(userId);
