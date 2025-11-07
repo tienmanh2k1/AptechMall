@@ -20,8 +20,10 @@ import {
   patchUser,
   deleteUser
 } from '../services/userApi';
+import { useAuth } from '../../auth/context/AuthContext';
 
 const AdminUserManagementPage = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,6 +121,12 @@ const AdminUserManagementPage = () => {
   };
 
   const handleDelete = async (userId, username) => {
+    // Prevent admin from deleting their own account
+    if (userId === currentUser?.userId) {
+      toast.error('You cannot delete your own account');
+      return;
+    }
+
     if (!window.confirm(`Are you sure you want to delete user "${username}"?`)) {
       return;
     }
@@ -371,13 +379,23 @@ const AdminUserManagementPage = () => {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(user.userId, user.username)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {user.userId !== currentUser?.userId ? (
+                            <button
+                              onClick={() => handleDelete(user.userId, user.username)}
+                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="text-gray-400 cursor-not-allowed p-1 rounded"
+                              title="Cannot delete yourself"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

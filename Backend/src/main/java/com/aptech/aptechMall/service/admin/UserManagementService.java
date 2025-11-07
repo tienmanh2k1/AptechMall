@@ -4,6 +4,7 @@ import com.aptech.aptechMall.dto.user.UserResponseDTO;
 import com.aptech.aptechMall.dto.user.UserUpdateDTO;
 import com.aptech.aptechMall.model.jpa.User;
 import com.aptech.aptechMall.repository.UserRepository;
+import com.aptech.aptechMall.security.AuthenticationUtil;
 import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.Status;
 import jakarta.transaction.Transactional;
@@ -85,9 +86,28 @@ public class UserManagementService {
     }
 
     public void deleteUser(Long id) {
+        // Check if user exists
         if (!userRepository.existsById(id)) {
             throw new RuntimeException("User not found with id: " + id);
         }
+
+        // Prevent admin from deleting their own account
+        Long currentUserId = AuthenticationUtil.getCurrentUserId();
+        if (id.equals(currentUserId)) {
+            throw new RuntimeException("You cannot delete your own account");
+        }
+
+        // Prevent deletion of the last admin account
+        User userToDelete = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+
+        if (userToDelete.getRole() == Role.ADMIN) {
+            long adminCount = userRepository.countByRole(Role.ADMIN);
+            if (adminCount <= 1) {
+                throw new RuntimeException("Cannot delete the last admin account");
+            }
+        }
+
         userRepository.deleteById(id);
     }
 }

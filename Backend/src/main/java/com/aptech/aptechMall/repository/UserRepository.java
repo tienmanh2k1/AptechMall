@@ -1,6 +1,7 @@
 package com.aptech.aptechMall.repository;
 
 import com.aptech.aptechMall.model.jpa.User;
+import com.aptech.aptechMall.security.Role;
 import com.aptech.aptechMall.security.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -37,4 +38,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return Number of users with the given status
      */
     long countByStatus(Status status);
+
+    /**
+     * Count users by role
+     * @param role User role (ADMIN, STAFF, CUSTOMER)
+     * @return Number of users with the given role
+     */
+    long countByRole(Role role);
 }
