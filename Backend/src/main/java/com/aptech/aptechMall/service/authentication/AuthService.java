@@ -23,6 +23,35 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Service xử lý xác thực và quản lý người dùng (Authentication Service)
+ *
+ * Chức năng chính:
+ * - Đăng ký tài khoản mới (register)
+ * - Đăng nhập (authenticate) - username/email + password
+ * - Đăng nhập Google OAuth (authenticateGoogle)
+ * - Đăng xuất (logout) - blacklist JWT token trong Redis
+ * - Refresh access token - tạo token mới từ refresh token
+ * - Quản lý profile người dùng (getProfile, updateProfile)
+ *
+ * Hệ thống JWT Token:
+ * - Access Token: TTL 5 phút, chứa userId, email, role, fullname, status
+ * - Refresh Token: TTL 8 ngày, lưu trong httpOnly cookie
+ * - Logout: Thêm access token vào Redis blacklist với TTL = thời gian còn lại của token
+ *
+ * Bảo mật:
+ * - Password được hash bằng BCrypt (PasswordEncoder)
+ * - JWT signed bằng secret key (cấu hình trong application.properties)
+ * - Refresh token lưu trong httpOnly cookie (không thể truy cập từ JavaScript)
+ * - Token blacklist trong Redis để logout ngay lập tức
+ *
+ * Dependencies:
+ * - UserRepository: Truy vấn database users
+ * - PasswordEncoder: Hash và verify password
+ * - JwtService: Tạo và validate JWT tokens
+ * - RedisService: Quản lý token blacklist
+ * - FileUploadService: Upload avatar người dùng
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,6 +62,13 @@ public class AuthService {
     private final RedisService redisService;
     private final FileUploadService fileUploadService;
 
+    /**
+     * Lấy thông tin profile của user hiện tại từ JWT token
+     *
+     * @param request HttpServletRequest chứa Authorization header với JWT token
+     * @param response HttpServletResponse để set status code khi có lỗi
+     * @return ProfileResponse chứa thông tin user hoặc null nếu có lỗi
+     */
     public ProfileResponse getProfile(HttpServletRequest request, HttpServletResponse response){
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
