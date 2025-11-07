@@ -1,6 +1,7 @@
 package com.aptech.aptechMall.dto.wallet;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +22,10 @@ public class WalletResponse {
     private Long walletId;
     private Long userId;
     private BigDecimal balance;
+
+    @JsonProperty("isLocked")
     private boolean isLocked;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

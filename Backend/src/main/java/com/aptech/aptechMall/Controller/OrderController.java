@@ -3,6 +3,7 @@ package com.aptech.aptechMall.Controller;
 import com.aptech.aptechMall.dto.ApiResponse;
 import com.aptech.aptechMall.dto.order.CheckoutRequest;
 import com.aptech.aptechMall.dto.order.OrderResponse;
+import com.aptech.aptechMall.dto.order.UpdateOrderAddressRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderStatusRequest;
 import com.aptech.aptechMall.security.AuthenticationUtil;
 import com.aptech.aptechMall.service.OrderService;
@@ -190,6 +191,28 @@ public class OrderController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(order, "Remaining amount paid successfully")
+        );
+    }
+
+    /**
+     * Update order shipping address (User can only update when order is PENDING)
+     * PUT /api/orders/{orderId}/address
+     *
+     * @param orderId Order ID
+     * @param request UpdateOrderAddressRequest
+     * @return Updated OrderResponse
+     */
+    @PutMapping("/{orderId}/address")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrderAddress(
+            @PathVariable Long orderId,
+            @Valid @RequestBody UpdateOrderAddressRequest request) {
+        Long userId = AuthenticationUtil.getCurrentUserId();
+        log.info("PUT /api/orders/{}/address - userId: {}", orderId, userId);
+
+        OrderResponse order = orderService.updateOrderAddress(userId, orderId, request);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(order, "Đã cập nhật địa chỉ đơn hàng thành công")
         );
     }
 }

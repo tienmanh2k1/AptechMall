@@ -1,4 +1,4 @@
-export const APP_NAME = 'PandaMall';
+export const APP_NAME = 'AptechMall';
 export const API_TIMEOUT = 10000;
 
 export const ROUTES = {

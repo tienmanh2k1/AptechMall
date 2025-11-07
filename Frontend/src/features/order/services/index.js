@@ -54,3 +54,8 @@ export const payRemainingAmount = async (...args) => {
   const module = await api;
   return module.payRemainingAmount(...args);
 };
+
+export const updateOrderAddress = async (...args) => {
+  const module = await api;
+  return module.updateOrderAddress(...args);
+};

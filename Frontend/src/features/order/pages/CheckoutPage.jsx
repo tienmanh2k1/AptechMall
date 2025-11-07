@@ -6,10 +6,12 @@ import { checkout } from '../services';
 import { useCart } from '../../cart/context/CartContext';
 import { useCurrency } from '../../currency/context/CurrencyContext';
 import { formatCurrency } from '../../currency/services/currencyApi';
+import { getDefaultAddress } from '../../user/services/addressApi';
 import OrderItemsList from '../components/OrderItemsList';
+import AddressSelectorModal from '../components/AddressSelectorModal';
 import Loading from '../../../shared/components/Loading';
 import ErrorMessage from '../../../shared/components/ErrorMessage';
-import { ShoppingBag, Wallet } from 'lucide-react';
+import { ShoppingBag, Wallet, MapPin, User, Phone, Edit2 } from 'lucide-react';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -24,6 +26,10 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Address state
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [showAddressModal, setShowAddressModal] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -68,6 +74,43 @@ const CheckoutPage = () => {
 
     fetchCart();
   }, [navigate, selectedItemIds]);
+
+  // Fetch default address
+  useEffect(() => {
+    const fetchDefaultAddr = async () => {
+      try {
+        const defaultAddr = await getDefaultAddress();
+        if (defaultAddr) {
+          setSelectedAddress(defaultAddr);
+          setFormData(prev => ({
+            ...prev,
+            shippingAddress: defaultAddr.fullAddress,
+            phone: defaultAddr.phone
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching default address:', error);
+        // Not critical, just log the error
+      }
+    };
+
+    fetchDefaultAddr();
+  }, []);
+
+  // Handle address selection
+  const handleSelectAddress = (address) => {
+    setSelectedAddress(address);
+    setFormData(prev => ({
+      ...prev,
+      shippingAddress: address.fullAddress,
+      phone: address.phone
+    }));
+    setFormErrors(prev => ({
+      ...prev,
+      shippingAddress: '',
+      phone: ''
+    }));
+  };
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -208,55 +251,75 @@ const CheckoutPage = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Shipping Information */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Thông tin giao hàng</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(true)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4 mr-1" />
+                  {selectedAddress ? 'Thay đổi' : 'Chọn địa chỉ'}
+                </button>
+              </div>
+
+              {selectedAddress ? (
+                <div className="mb-4 p-4 border-2 border-primary-500 bg-primary-50 rounded-lg">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-gray-600" />
+                      <span className="font-medium text-gray-900">
+                        {selectedAddress.receiverName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-600" />
+                      <span className="text-gray-700">{selectedAddress.phone}</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-gray-600 mt-1 flex-shrink-0" />
+                      <p className="text-gray-700 text-sm">
+                        {selectedAddress.fullAddress}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                  <MapPin className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600">
+                    Chưa chọn địa chỉ giao hàng
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddressModal(true)}
+                    className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Click để chọn địa chỉ
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-4">
-                {/* Shipping Address */}
-                <div>
-                  <label htmlFor="shippingAddress" className="block text-sm font-medium text-gray-700 mb-2">
-                    Shipping Address <span className="text-red-600">*</span>
-                  </label>
-                  <textarea
-                    id="shippingAddress"
-                    name="shippingAddress"
-                    rows="3"
-                    value={formData.shippingAddress}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
-                      formErrors.shippingAddress ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter your full shipping address"
-                  />
-                  {formErrors.shippingAddress && (
-                    <p className="mt-1 text-sm text-red-600">{formErrors.shippingAddress}</p>
-                  )}
-                </div>
+                {/* Hidden fields for form validation */}
+                <input
+                  type="hidden"
+                  name="shippingAddress"
+                  value={formData.shippingAddress}
+                />
+                <input type="hidden" name="phone" value={formData.phone} />
 
-                {/* Phone */}
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent ${
-                      formErrors.phone ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="+1 234 567 8900"
-                  />
-                  {formErrors.phone && (
-                    <p className="mt-1 text-sm text-red-600">{formErrors.phone}</p>
-                  )}
-                </div>
+                {formErrors.shippingAddress && (
+                  <p className="text-sm text-red-600">{formErrors.shippingAddress}</p>
+                )}
+                {formErrors.phone && (
+                  <p className="text-sm text-red-600">{formErrors.phone}</p>
+                )}
 
                 {/* Note */}
                 <div>
                   <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-2">
-                    Order Note (Optional)
+                    Ghi chú đơn hàng (Không bắt buộc)
                   </label>
                   <textarea
                     id="note"
@@ -265,7 +328,7 @@ const CheckoutPage = () => {
                     value={formData.note}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="Any special instructions for your order"
+                    placeholder="Ghi chú đặc biệt cho đơn hàng của bạn"
                   />
                 </div>
               </div>
@@ -386,6 +449,14 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Address Selector Modal */}
+      <AddressSelectorModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        onSelectAddress={handleSelectAddress}
+        selectedAddressId={selectedAddress?.id}
+      />
     </div>
   );
 };

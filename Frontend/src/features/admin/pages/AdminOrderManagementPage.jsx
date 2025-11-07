@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   Search,
@@ -10,14 +11,21 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  Truck,
 } from 'lucide-react';
-import { getAllOrders, updateOrderStatus } from '../services/adminOrderApi';
+import {
+  getAllOrders,
+  updateOrderStatus,
+  updateOrderFees,
+} from '../services/adminOrderApi';
+import UpdateOrderFeesModal from '../components/UpdateOrderFeesModal';
 
 /**
  * Admin Order Management Page
  * Allows administrators to view and manage all orders
  */
 const AdminOrderManagementPage = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -34,6 +42,10 @@ const AdminOrderManagementPage = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
+
+  // Fee update modal state
+  const [showFeesModal, setShowFeesModal] = useState(false);
+  const [selectedOrderForFees, setSelectedOrderForFees] = useState(null);
 
   const pageSize = 10;
 
@@ -120,6 +132,33 @@ const AdminOrderManagementPage = () => {
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error(error.response?.data?.message || 'Failed to update order status');
+    }
+  };
+
+  // Fee update handlers
+  const openFeesModal = (order) => {
+    setSelectedOrderForFees(order);
+    setShowFeesModal(true);
+  };
+
+  const closeFeesModal = () => {
+    setShowFeesModal(false);
+    setSelectedOrderForFees(null);
+  };
+
+  const handleUpdateFees = async (orderId, feesData) => {
+    try {
+      const response = await updateOrderFees(orderId, feesData);
+
+      if (response.success) {
+        toast.success('Đã cập nhật phí đơn hàng thành công!');
+        fetchOrders(); // Refresh the list
+      } else {
+        toast.error(response.message || 'Cập nhật phí thất bại');
+      }
+    } catch (error) {
+      console.error('Error updating fees:', error);
+      throw error; // Let the modal handle the error
     }
   };
 
@@ -326,13 +365,29 @@ const AdminOrderManagementPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => openStatusModal(order)}
-                          className="inline-flex items-center px-3 py-1.5 mr-2 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Update Status
-                        </button>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => navigate(`/admin/orders/${order.id}`)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => openStatusModal(order)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Update Status
+                          </button>
+                          <button
+                            onClick={() => openFeesModal(order)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          >
+                            <Truck className="w-4 h-4 mr-1" />
+                            Update Fees
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -436,6 +491,14 @@ const AdminOrderManagementPage = () => {
           </div>
         </div>
       )}
+
+      {/* Update Fees Modal */}
+      <UpdateOrderFeesModal
+        isOpen={showFeesModal}
+        onClose={closeFeesModal}
+        order={selectedOrderForFees}
+        onUpdate={handleUpdateFees}
+      />
     </div>
   );
 };

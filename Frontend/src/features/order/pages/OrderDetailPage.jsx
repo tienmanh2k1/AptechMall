@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { getOrderById, cancelOrder, payRemainingAmount } from '../services';
+import { getOrderById, cancelOrder, payRemainingAmount, updateOrderAddress } from '../services';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import OrderItemsList from '../components/OrderItemsList';
 import Loading from '../../../shared/components/Loading';
@@ -9,7 +9,7 @@ import ErrorMessage from '../../../shared/components/ErrorMessage';
 import { formatPrice } from '../../../shared/utils/formatters';
 import { normalizeMarketplace } from '../../../shared/utils/marketplace';
 import { useCurrency } from '../../currency/context/CurrencyContext';
-import { ArrowLeft, MapPin, Phone, FileText, DollarSign, Clock, CreditCard, TrendingUp } from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, FileText, DollarSign, Clock, CreditCard, TrendingUp, Edit } from 'lucide-react';
 
 const OrderDetailPage = () => {
   const { orderId } = useParams();
@@ -20,6 +20,15 @@ const OrderDetailPage = () => {
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [paying, setPaying] = useState(false);
+
+  // Update address modal state
+  const [showUpdateAddressModal, setShowUpdateAddressModal] = useState(false);
+  const [updatingAddress, setUpdatingAddress] = useState(false);
+  const [addressFormData, setAddressFormData] = useState({
+    shippingAddress: '',
+    phone: '',
+    note: ''
+  });
 
   const fetchOrder = async () => {
     try {
@@ -79,6 +88,35 @@ const OrderDetailPage = () => {
       toast.error(err.response?.data?.message || 'Failed to pay remaining amount');
     } finally {
       setPaying(false);
+    }
+  };
+
+  const handleOpenUpdateAddressModal = () => {
+    setAddressFormData({
+      shippingAddress: order.shippingAddress || '',
+      phone: order.phone || '',
+      note: ''
+    });
+    setShowUpdateAddressModal(true);
+  };
+
+  const handleUpdateAddress = async () => {
+    if (!addressFormData.shippingAddress.trim() || !addressFormData.phone.trim()) {
+      toast.error('Vui lòng nhập đầy đủ địa chỉ và số điện thoại');
+      return;
+    }
+
+    try {
+      setUpdatingAddress(true);
+      await updateOrderAddress(orderId, addressFormData);
+      toast.success('Đã cập nhật địa chỉ đơn hàng thành công!');
+      setShowUpdateAddressModal(false);
+      fetchOrder(); // Refresh order data
+    } catch (err) {
+      console.error('Error updating order address:', err);
+      toast.error(err.response?.data?.message || 'Cập nhật địa chỉ thất bại');
+    } finally {
+      setUpdatingAddress(false);
     }
   };
 
@@ -213,12 +251,23 @@ const OrderDetailPage = () => {
 
           {/* Shipping Information */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Thông tin giao hàng</h2>
+              {order.status === 'PENDING' && (
+                <button
+                  onClick={handleOpenUpdateAddressModal}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 border border-primary-300 rounded-lg hover:bg-primary-50 transition-colors"
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  Thay đổi địa chỉ
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-gray-400 mt-1" />
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Address</p>
+                  <p className="text-sm text-gray-600 mb-1">Địa chỉ</p>
                   <p className="text-gray-900">{order.shippingAddress || 'N/A'}</p>
                 </div>
               </div>
@@ -226,7 +275,7 @@ const OrderDetailPage = () => {
               <div className="flex items-start gap-3">
                 <Phone className="w-5 h-5 text-gray-400 mt-1" />
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Phone</p>
+                  <p className="text-sm text-gray-600 mb-1">Số điện thoại</p>
                   <p className="text-gray-900">{order.phone || 'N/A'}</p>
                 </div>
               </div>
@@ -235,12 +284,17 @@ const OrderDetailPage = () => {
                 <div className="flex items-start gap-3">
                   <FileText className="w-5 h-5 text-gray-400 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Order Note</p>
+                    <p className="text-sm text-gray-600 mb-1">Ghi chú</p>
                     <p className="text-gray-900">{order.note}</p>
                   </div>
                 </div>
               )}
             </div>
+            {order.status !== 'PENDING' && (
+              <div className="mt-3 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                ℹ️ Chỉ có thể thay đổi địa chỉ khi đơn hàng ở trạng thái PENDING
+              </div>
+            )}
           </div>
 
           {/* Payment Information */}
@@ -460,6 +514,78 @@ const OrderDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Update Address Modal */}
+      {showUpdateAddressModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Thay đổi địa chỉ giao hàng
+            </h3>
+
+            <div className="space-y-4">
+              {/* Shipping Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Địa chỉ giao hàng *
+                </label>
+                <textarea
+                  value={addressFormData.shippingAddress}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, shippingAddress: e.target.value })}
+                  rows="3"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Nhập địa chỉ chi tiết..."
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Số điện thoại *
+                </label>
+                <input
+                  type="tel"
+                  value={addressFormData.phone}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Nhập số điện thoại..."
+                />
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ghi chú (Không bắt buộc)
+                </label>
+                <textarea
+                  value={addressFormData.note}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, note: e.target.value })}
+                  rows="2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Lý do thay đổi địa chỉ..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowUpdateAddressModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                disabled={updatingAddress}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleUpdateAddress}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={updatingAddress}
+              >
+                {updatingAddress ? 'Đang cập nhật...' : 'Cập nhật'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

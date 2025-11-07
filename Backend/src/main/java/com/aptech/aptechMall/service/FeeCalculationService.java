@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * Service for calculating order fees
- * Implements PandaMall fee structure
+ * Implements AptechMall fee structure
  */
 @Service
 @RequiredArgsConstructor

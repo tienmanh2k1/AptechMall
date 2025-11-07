@@ -26,11 +26,26 @@ const AdminWalletManagementPage = () => {
     setLoading(true);
     try {
       const response = await getAllWallets();
-      if (response.success && response.data) {
-        setWallets(response.data);
+      console.log('Wallets API Response:', response);
+
+      // Handle both direct array and wrapped response
+      let walletsData = [];
+      if (Array.isArray(response)) {
+        // Direct array response
+        walletsData = response;
+      } else if (response.success && response.data) {
+        // Wrapped response with success and data
+        walletsData = response.data;
+      } else if (response.data && Array.isArray(response.data)) {
+        // Response with data field
+        walletsData = response.data;
       } else {
-        toast.error('Failed to load wallets');
+        toast.error('Invalid response format from server');
+        return;
       }
+
+      console.log('Parsed wallets data:', walletsData);
+      setWallets(walletsData);
     } catch (error) {
       console.error('Error fetching wallets:', error);
       toast.error(error.response?.data?.message || 'Failed to load wallets');
@@ -69,7 +84,12 @@ const AdminWalletManagementPage = () => {
 
     try {
       const response = await lockWallet(userId);
-      if (response.success) {
+      console.log('Lock wallet response:', response);
+
+      // Check for success in various response formats
+      const isSuccess = response?.success === true || response?.message?.includes('success') || response === true;
+
+      if (isSuccess) {
         toast.success(`Locked wallet for ${username}`);
 
         // Update state immediately (optimistic update)
@@ -96,7 +116,12 @@ const AdminWalletManagementPage = () => {
 
     try {
       const response = await unlockWallet(userId);
-      if (response.success) {
+      console.log('Unlock wallet response:', response);
+
+      // Check for success in various response formats
+      const isSuccess = response?.success === true || response?.message?.includes('success') || response === true;
+
+      if (isSuccess) {
         toast.success(`Unlocked wallet for ${username}`);
 
         // Update state immediately (optimistic update)
@@ -274,7 +299,13 @@ const AdminWalletManagementPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredWallets.map((wallet) => (
+                  filteredWallets.map((wallet) => {
+                    // Debug logging for each wallet
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`Wallet ${wallet.walletId}: isLocked = ${wallet.isLocked} (type: ${typeof wallet.isLocked})`);
+                    }
+
+                    return (
                     <tr key={wallet.walletId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -334,7 +365,8 @@ const AdminWalletManagementPage = () => {
                         )}
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -124,7 +124,7 @@ const RegisterPage = () => {
       // Save to context and localStorage
       login(token, user);
 
-      toast.success('Registration successful! Welcome to PandaMall!');
+      toast.success('Đăng ký thành công! Chào mừng đến với AptechMall!');
 
       // Redirect to home
       navigate('/', { replace: true });
@@ -164,8 +164,8 @@ const RegisterPage = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full mb-4">
               <UserPlus className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h2>
-            <p className="text-gray-600">Join PandaMall today</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Tạo tài khoản</h2>
+            <p className="text-gray-600">Tham gia AptechMall ngay hôm nay</p>
           </div>
 
           {/* Form */}

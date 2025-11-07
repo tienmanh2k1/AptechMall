@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Package, LogOut, LogIn, UserPlus, Wallet } from 'lucide-react';
+import { ShoppingCart, User, Search, Package, LogOut, LogIn, UserPlus, Wallet, MapPin } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useCart } from '../../features/cart/context/CartContext';
 import { useAuth } from '../../features/auth/context/AuthContext';
@@ -88,6 +88,22 @@ const Header = () => {
                       <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      My Profile
+                    </Link>
+                    <Link
+                      to="/addresses"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <MapPin className="w-4 h-4" />
+                      My Addresses
+                    </Link>
                     <Link
                       to="/wallet"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"

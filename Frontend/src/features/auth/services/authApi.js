@@ -154,3 +154,39 @@ export const generateRefreshOauth = async () => {
     throw error;
   }
 };
+
+/**
+ * Update user profile
+ * @param {Object} profileData
+ * @param {string} [profileData.fullName] - User full name
+ * @param {string} [profileData.phone] - User phone number
+ * @param {string} [profileData.address] - User address
+ * @returns {Promise<Object>} Updated user data
+ */
+export const updateProfile = async (profileData) => {
+  try {
+    const response = await api.post('/auth/profile', profileData);
+    return response.data;
+  } catch (error) {
+    console.error('Update profile error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update user credentials (email or password)
+ * @param {Object} credentials
+ * @param {string} [credentials.email] - New email
+ * @param {string} [credentials.currentPassword] - Current password (required)
+ * @param {string} [credentials.newPassword] - New password
+ * @returns {Promise<Object>} Success response
+ */
+export const updateCredentials = async (credentials) => {
+  try {
+    const response = await api.post('/auth/update-credentials', credentials);
+    return response.data;
+  } catch (error) {
+    console.error('Update credentials error:', error);
+    throw error;
+  }
+};

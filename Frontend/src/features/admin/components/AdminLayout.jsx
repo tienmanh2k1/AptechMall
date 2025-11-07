@@ -6,8 +6,6 @@ import {
   ShoppingCart,
   Users,
   Wallet,
-  Store,
-  Settings,
   LogOut,
   Menu,
   X,
@@ -63,20 +61,6 @@ const AdminLayout = () => {
       description: 'Wallet Management',
       roles: ['ADMIN'] // Admin only
     },
-    {
-      name: 'Shops',
-      path: '/admin/shops',
-      icon: Store,
-      description: 'Shop Management',
-      roles: ['ADMIN'] // Admin only
-    },
-    {
-      name: 'Fee Config',
-      path: '/admin/fee-config',
-      icon: Settings,
-      description: 'System Configuration',
-      roles: ['ADMIN'] // Admin only
-    },
   ];
 
   // Filter menu items based on user role
@@ -99,9 +83,9 @@ const AdminLayout = () => {
           <div className="flex items-center justify-between">
             {sidebarOpen && (
               <div>
-                <h1 className="text-xl font-bold text-red-500">PandaMall</h1>
+                <h1 className="text-xl font-bold text-red-500">AptechMall</h1>
                 <p className="text-xs text-gray-400">
-                  {user?.role === 'STAFF' ? 'Staff Portal' : 'Admin Portal'}
+                  {user?.role === 'STAFF' ? 'Cổng nhân viên' : 'Cổng quản trị'}
                 </p>
               </div>
             )}
@@ -208,8 +192,8 @@ const AdminLayout = () => {
         {/* Footer */}
         <footer className="bg-white border-t border-gray-200 px-6 py-4 mt-8">
           <div className="flex items-center justify-between text-sm text-gray-600">
-            <p>© 2025 PandaMall {user?.role === 'STAFF' ? 'Staff Portal' : 'Admin Portal'}</p>
-            <p>Logged in as: <span className="font-medium">{user?.email}</span> ({user?.role})</p>
+            <p>© 2025 AptechMall {user?.role === 'STAFF' ? 'Cổng nhân viên' : 'Cổng quản trị'}</p>
+            <p>Đăng nhập: <span className="font-medium">{user?.email}</span> ({user?.role})</p>
           </div>
         </footer>
       </div>

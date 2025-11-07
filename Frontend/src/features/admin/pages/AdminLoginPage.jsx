@@ -97,10 +97,10 @@ const AdminLoginPage = () => {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">
-            Admin Portal
+            Cổng quản trị
           </h1>
           <p className="text-gray-400">
-            Sign in to access the management dashboard
+            Đăng nhập để truy cập bảng điều khiển quản lý
           </p>
         </div>
 
@@ -113,7 +113,7 @@ const AdminLoginPage = () => {
                 htmlFor="username"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Username or Email
+                Tên đăng nhập hoặc Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -126,7 +126,7 @@ const AdminLoginPage = () => {
                   value={formData.username}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-                  placeholder="Enter your username"
+                  placeholder="Nhập tên đăng nhập"
                   disabled={loading}
                   autoFocus
                 />
@@ -139,7 +139,7 @@ const AdminLoginPage = () => {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Password
+                Mật khẩu
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -152,7 +152,7 @@ const AdminLoginPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-                  placeholder="Enter your password"
+                  placeholder="Nhập mật khẩu"
                   disabled={loading}
                 />
                 <button
@@ -193,10 +193,10 @@ const AdminLoginPage = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Signing in...
+                  Đang đăng nhập...
                 </span>
               ) : (
-                'Sign In to Dashboard'
+                'Đăng nhập'
               )}
             </button>
           </form>
@@ -204,17 +204,17 @@ const AdminLoginPage = () => {
           {/* Demo Accounts Info */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-xs text-gray-500 text-center mb-3">
-              Demo Accounts for Testing:
+              Tài khoản Demo để kiểm tra:
             </p>
             <div className="space-y-2 text-xs">
               <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-medium text-gray-700">Admin Account:</p>
+                <p className="font-medium text-gray-700">Tài khoản Admin:</p>
                 <p className="text-gray-600 mt-1">
-                  <span className="font-mono">admin@pandamall.com</span> / <span className="font-mono">admin123</span>
+                  <span className="font-mono">admin@aptechmall.com</span> / <span className="font-mono">admin123</span>
                 </p>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-medium text-gray-700">Staff Account:</p>
+                <p className="font-medium text-gray-700">Tài khoản Nhân viên:</p>
                 <p className="text-gray-600 mt-1">
                   <span className="font-mono">VanB</span> / <span className="font-mono">123456</span>
                 </p>
@@ -228,7 +228,7 @@ const AdminLoginPage = () => {
               onClick={() => navigate('/')}
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
             >
-              ← Back to Customer Portal
+              ← Quay về trang khách hàng
             </button>
           </div>
         </div>
@@ -236,7 +236,7 @@ const AdminLoginPage = () => {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-400">
-            © 2025 PandaMall. Admin Portal v1.0
+            © 2025 AptechMall. Cổng quản trị v1.0
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@ package com.aptech.aptechMall.Controller;
 
 import com.aptech.aptechMall.dto.ApiResponse;
 import com.aptech.aptechMall.dto.order.OrderResponse;
+import com.aptech.aptechMall.dto.order.UpdateOrderAddressRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderFeesRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderStatusRequest;
 import com.aptech.aptechMall.entity.OrderStatus;
@@ -123,6 +124,29 @@ public class AdminOrderController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(order, "Order fees updated successfully")
+        );
+    }
+
+    /**
+     * Update order shipping address (Admin/Staff can update when PENDING or CONFIRMED)
+     * PUT /api/admin/orders/{orderId}/address
+     *
+     * @param orderId Order ID
+     * @param request UpdateOrderAddressRequest
+     * @return Updated OrderResponse
+     */
+    @PutMapping("/{orderId}/address")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrderAddress(
+            @PathVariable Long orderId,
+            @Valid @RequestBody UpdateOrderAddressRequest request) {
+
+        log.info("PUT /api/admin/orders/{}/address - shippingAddress: {}, phone: {}",
+                orderId, request.getShippingAddress(), request.getPhone());
+
+        OrderResponse order = orderService.updateOrderAddressAdmin(orderId, request);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(order, "Đã cập nhật địa chỉ đơn hàng thành công")
         );
     }
 }

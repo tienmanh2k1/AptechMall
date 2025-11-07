@@ -170,3 +170,26 @@ export const payRemainingAmount = async (orderId) => {
     throw error;
   }
 };
+
+/**
+ * Update order shipping address (User can only update when order is PENDING)
+ * Backend: PUT /api/orders/{orderId}/address
+ * User ID is automatically extracted from JWT token by backend
+ *
+ * @param {number} orderId - Order ID
+ * @param {Object} addressData - Address data
+ * @param {string} addressData.shippingAddress - New shipping address
+ * @param {string} addressData.phone - New phone number
+ * @param {string} addressData.note - Optional note explaining the change
+ * @returns {Promise<Object>} Updated order
+ */
+export const updateOrderAddress = async (orderId, addressData) => {
+  try {
+    const response = await api.put(`/orders/${orderId}/address`, addressData);
+    // Backend returns { data: {...}, message: "...", success: true }
+    return response.data.data;
+  } catch (error) {
+    console.error('Error updating order address:', error);
+    throw error;
+  }
+};

@@ -217,8 +217,8 @@ const LoginPage = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full mb-4">
               <LogIn className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-            <p className="text-gray-600">Sign in to your PandaMall account</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Chào mừng trở lại</h2>
+            <p className="text-gray-600">Đăng nhập vào tài khoản AptechMall của bạn</p>
           </div>
 
           {/* Form */}
@@ -226,7 +226,7 @@ const LoginPage = () => {
             {/* Username Field */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Username or Email
+                Tên đăng nhập hoặc Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -242,7 +242,7 @@ const LoginPage = () => {
                   className={`block w-full pl-10 pr-3 py-3 border ${
                     errors.username ? 'border-red-500' : 'border-gray-300'
                   } rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
-                  placeholder="username or email@example.com"
+                  placeholder="tênđăngnhập hoặc email@example.com"
                 />
               </div>
               {errors.username && <p className="mt-1 text-sm text-red-600">{errors.username}</p>}
@@ -251,7 +251,7 @@ const LoginPage = () => {
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                Mật khẩu
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -267,7 +267,7 @@ const LoginPage = () => {
                   className={`block w-full pl-10 pr-12 py-3 border ${
                     errors.password ? 'border-red-500' : 'border-gray-300'
                   } rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
-                  placeholder="Enter your password"
+                  placeholder="Nhập mật khẩu của bạn"
                 />
                 <button
                   type="button"
@@ -294,13 +294,13 @@ const LoginPage = () => {
                   className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                  Remember me
+                  Ghi nhớ đăng nhập
                 </label>
               </div>
 
               <div className="text-sm">
                 <Link to="/forgot-password" className="font-medium text-orange-600 hover:text-orange-500">
-                  Forgot password?
+                  Quên mật khẩu?
                 </Link>
               </div>
             </div>
@@ -314,12 +314,12 @@ const LoginPage = () => {
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Signing in...</span>
+                  <span>Đang đăng nhập...</span>
                 </>
               ) : (
                 <>
                   <LogIn className="w-5 h-5" />
-                  <span>Sign In</span>
+                  <span>Đăng nhập</span>
                 </>
               )}
             </button>
@@ -343,7 +343,7 @@ const LoginPage = () => {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">New to PandaMall?</span>
+                <span className="px-2 bg-white text-gray-500">Chưa có tài khoản AptechMall?</span>
               </div>
             </div>
 
@@ -352,7 +352,7 @@ const LoginPage = () => {
                 to="/register"
                 className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
               >
-                Create an account
+                Tạo tài khoản mới
               </Link>
             </div>
           </div>

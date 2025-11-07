@@ -4,6 +4,7 @@ import com.aptech.aptechMall.Exception.*;
 import com.aptech.aptechMall.dto.exchange.ExchangeRateResponse;
 import com.aptech.aptechMall.dto.order.CheckoutRequest;
 import com.aptech.aptechMall.dto.order.OrderResponse;
+import com.aptech.aptechMall.dto.order.UpdateOrderAddressRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderFeesRequest;
 import com.aptech.aptechMall.dto.order.UpdateOrderStatusRequest;
 import com.aptech.aptechMall.entity.*;
@@ -621,6 +622,14 @@ public class OrderService {
         Order order = orderRepository.findByIdWithItems(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
+        // Only allow fee updates when order is CONFIRMED
+        if (order.getStatus() != OrderStatus.CONFIRMED) {
+            throw new IllegalStateException(
+                    "Chỉ có thể cập nhật phí khi đơn hàng ở trạng thái CONFIRMED. " +
+                    "Trạng thái hiện tại: " + order.getStatus()
+            );
+        }
+
         // Update domestic shipping fee (from China warehouse to port)
         if (request.getDomesticShippingFee() != null) {
             // Convert CNY to VND
@@ -689,6 +698,86 @@ public class OrderService {
                 totalAmount, depositAmount, remainingAmount);
 
         Order updatedOrder = orderRepository.save(order);
+
+        return OrderResponse.fromEntity(updatedOrder);
+    }
+
+    /**
+     * Update order shipping address (User operation)
+     * Users can only update address when order is PENDING
+     * @param userId User ID (from JWT token)
+     * @param orderId Order ID
+     * @param request UpdateOrderAddressRequest
+     * @return Updated OrderResponse
+     */
+    public OrderResponse updateOrderAddress(Long userId, Long orderId, UpdateOrderAddressRequest request) {
+        log.info("User {} updating order {} address", userId, orderId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        // Verify ownership
+        if (!order.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Bạn không có quyền thay đổi địa chỉ đơn hàng này");
+        }
+
+        // Only allow address updates when order is PENDING
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Chỉ có thể thay đổi địa chỉ khi đơn hàng ở trạng thái PENDING. " +
+                    "Trạng thái hiện tại: " + order.getStatus()
+            );
+        }
+
+        // Update address and phone
+        order.setShippingAddress(request.getShippingAddress());
+        order.setPhone(request.getPhone());
+
+        // Add note if provided
+        if (request.getNote() != null && !request.getNote().isEmpty()) {
+            String currentNote = order.getNote() != null ? order.getNote() : "";
+            order.setNote(currentNote + "\n[Đã thay đổi địa chỉ] " + request.getNote());
+        }
+
+        Order updatedOrder = orderRepository.save(order);
+        log.info("User {} updated order {} address successfully", userId, orderId);
+
+        return OrderResponse.fromEntity(updatedOrder);
+    }
+
+    /**
+     * Update order shipping address (Admin/Staff operation)
+     * Admin/Staff can update address when order is PENDING or CONFIRMED
+     * @param orderId Order ID
+     * @param request UpdateOrderAddressRequest
+     * @return Updated OrderResponse
+     */
+    public OrderResponse updateOrderAddressAdmin(Long orderId, UpdateOrderAddressRequest request) {
+        log.info("Admin/staff updating order {} address", orderId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        // Admin/Staff can update address when PENDING or CONFIRMED
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
+            throw new IllegalStateException(
+                    "Chỉ có thể thay đổi địa chỉ khi đơn hàng ở trạng thái PENDING hoặc CONFIRMED. " +
+                    "Trạng thái hiện tại: " + order.getStatus()
+            );
+        }
+
+        // Update address and phone
+        order.setShippingAddress(request.getShippingAddress());
+        order.setPhone(request.getPhone());
+
+        // Add note if provided
+        if (request.getNote() != null && !request.getNote().isEmpty()) {
+            String currentNote = order.getNote() != null ? order.getNote() : "";
+            order.setNote(currentNote + "\n[Admin/Staff đã thay đổi địa chỉ] " + request.getNote());
+        }
+
+        Order updatedOrder = orderRepository.save(order);
+        log.info("Admin/staff updated order {} address successfully", orderId);
 
         return OrderResponse.fromEntity(updatedOrder);
     }

@@ -93,7 +93,7 @@ public class LoginController {
         RegisterRequest request2 = new RegisterRequest("VanB", "123456", "Nguyen Van B", "STAFF", "NguyenVanB@gmail.com");
         RegisterRequest request3 = new RegisterRequest("VanC", "123456", "Nguyen Van C", "CUSTOMER", "NguyenVanC@gmail.com");
         RegisterRequest request4 = new RegisterRequest(null, "demo123", "Demo User", "CUSTOMER", "demo.account@gmail.com");
-        RegisterRequest request5 = new RegisterRequest(null, "admin123", "Demo Admin", "ADMIN", "admin@pandamall.com");
+        RegisterRequest request5 = new RegisterRequest(null, "admin123", "Demo Admin", "ADMIN", "admin@aptechmall.com");
         // Admin user with username "admin" and password "123456@"
         RegisterRequest adminRequest = new RegisterRequest("admin", "123456@", "Admin User", "ADMIN", "admin@aptechmall.com");
 

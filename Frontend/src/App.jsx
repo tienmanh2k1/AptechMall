@@ -19,38 +19,39 @@ import AdminRoute from './features/admin/components/AdminRoute';
 import AdminLayout from './features/admin/components/AdminLayout';
 import AdminLoginPage from './features/admin/pages/AdminLoginPage';
 import AdminHomePage from './features/admin/pages/AdminHomePage';
-import AdminShopManagementPage from './features/admin/pages/AdminShopManagementPage';
-import AdminSystemFeeConfigPage from './features/admin/pages/AdminSystemFeeConfigPage';
 import AdminUserManagementPage from './features/admin/pages/AdminUserManagementPage';
 import AdminWalletManagementPage from './features/admin/pages/AdminWalletManagementPage';
 import AdminDashboardPage from './features/admin/pages/AdminDashboardPage';
 import AdminOrderManagementPage from './features/admin/pages/AdminOrderManagementPage';
+import AdminOrderDetailPage from './features/admin/pages/AdminOrderDetailPage';
 import WalletPage from './features/wallet/pages/WalletPage';
 import BankTransferDepositPage from './features/wallet/pages/BankTransferDepositPage';
 import TransactionHistoryPage from './features/wallet/pages/TransactionHistoryPage';
+import ProfilePage from './features/user/pages/ProfilePage';
+import AddressManagementPage from './features/user/pages/AddressManagementPage';
 
 const HomePage = () => (
   <div className="container mx-auto px-4 py-16 text-center">
-    <h1 className="text-4xl font-bold mb-4">Welcome to PandaMall</h1>
-    <p className="text-gray-600 mb-8">Your one-stop shop for quality products</p>
+    <h1 className="text-4xl font-bold mb-4">Chào mừng đến với AptechMall</h1>
+    <p className="text-gray-600 mb-8">Nền tảng mua sắm trực tuyến uy tín</p>
     <div className="flex flex-col sm:flex-row gap-4 justify-center">
       <Link
         to="/search"
         className="inline-block px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
       >
-        Search Products
+        Tìm kiếm sản phẩm
       </Link>
       <Link
         to="/aliexpress/products/1005005244562338"
         className="inline-block px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors"
       >
-        View Sample Product
+        Xem sản phẩm mẫu
       </Link>
     </div>
 
     {/* Admin Login Link */}
     <div className="mt-12 pt-8 border-t border-gray-200">
-      <p className="text-sm text-gray-500 mb-4">Are you an administrator or staff member?</p>
+      <p className="text-sm text-gray-500 mb-4">Bạn là quản trị viên hoặc nhân viên?</p>
       <Link
         to="/admin/login"
         className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -58,7 +59,7 @@ const HomePage = () => (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
         </svg>
-        Admin Portal
+        Cổng quản trị
       </Link>
     </div>
   </div>
@@ -66,13 +67,13 @@ const HomePage = () => (
 
 const NotFoundPage = () => (
   <div className="container mx-auto px-4 py-16 text-center">
-    <h1 className="text-4xl font-bold mb-4">404 - Page Not Found</h1>
-    <p className="text-gray-600 mb-8">The page you are looking for does not exist.</p>
+    <h1 className="text-4xl font-bold mb-4">404 - Không tìm thấy trang</h1>
+    <p className="text-gray-600 mb-8">Trang bạn đang tìm kiếm không tồn tại.</p>
     <Link
       to="/"
       className="inline-block px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
     >
-      Go Home
+      Về trang chủ
     </Link>
   </div>
 );
@@ -145,6 +146,26 @@ function App() {
                 }
               />
 
+              {/* User Profile - Require authentication */}
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* User Addresses - Require authentication */}
+              <Route
+                path="/addresses"
+                element={
+                  <ProtectedRoute>
+                    <AddressManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Wallet routes - Require authentication */}
               <Route
                 path="/wallet"
@@ -187,10 +208,9 @@ function App() {
               <Route path="/admin/home" element={<AdminHomePage />} />
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/orders" element={<AdminOrderManagementPage />} />
+              <Route path="/admin/orders/:orderId" element={<AdminOrderDetailPage />} />
               <Route path="/admin/users" element={<AdminUserManagementPage />} />
               <Route path="/admin/wallets" element={<AdminWalletManagementPage />} />
-              <Route path="/admin/shops" element={<AdminShopManagementPage />} />
-              <Route path="/admin/fee-config" element={<AdminSystemFeeConfigPage />} />
             </Route>
             </Routes>
           </CartProvider>
