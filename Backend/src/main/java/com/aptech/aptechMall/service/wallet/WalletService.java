@@ -9,6 +9,7 @@ import com.aptech.aptechMall.repository.WalletTransactionRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,25 +36,38 @@ public class WalletService {
 
     /**
      * Get or create wallet for user
+     * Thread-safe: Handles race condition when multiple threads try to create wallet simultaneously
      * @param userId User ID
      * @return UserWallet entity
      */
     @Transactional
     public UserWallet getOrCreateWallet(Long userId) {
+        // First, try to find existing wallet
         return walletRepository.findByUserUserId(userId)
                 .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                    try {
+                        // Wallet doesn't exist, create new one
+                        User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
-                    UserWallet wallet = UserWallet.builder()
-                            .user(user)
-                            .balance(BigDecimal.ZERO)
-                            .isLocked(false)
-                            .build();
+                        UserWallet wallet = UserWallet.builder()
+                                .user(user)
+                                .balance(BigDecimal.ZERO)
+                                .isLocked(false)
+                                .build();
 
-                    UserWallet savedWallet = walletRepository.save(wallet);
-                    log.info("Created new wallet for user {}: walletId={}", userId, savedWallet.getId());
-                    return savedWallet;
+                        UserWallet savedWallet = walletRepository.save(wallet);
+                        log.info("Created new wallet for user {}: walletId={}", userId, savedWallet.getId());
+                        return savedWallet;
+
+                    } catch (DataIntegrityViolationException e) {
+                        // Another thread created the wallet while we were trying
+                        // This is a race condition - retry finding the wallet
+                        log.warn("Race condition detected while creating wallet for user {}. Retrying find...", userId);
+                        return walletRepository.findByUserUserId(userId)
+                                .orElseThrow(() -> new RuntimeException(
+                                    "Wallet creation failed and wallet still not found for user: " + userId));
+                    }
                 });
     }
 
