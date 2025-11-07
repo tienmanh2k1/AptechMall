@@ -80,11 +80,9 @@ public class LoginController {
         return ResponseEntity.ok(authService.updateProfile(request, response, info, avatar));
     }
 
-    @PostMapping("/update-credentials")
-    public ResponseEntity<String> updateAccountCredentials(HttpServletRequest request, HttpServletResponse response, @RequestBody UpdateCredential credentials){
-        authService.updateEmailOrPassword(request, response, credentials);
-        return ResponseEntity.ok("Credentials Updated");
-    }
+    // Old /update-credentials endpoint removed - replaced by:
+    // - POST /api/users/me/change-password (UserProfileController)
+    // - POST /api/users/me/change-email (UserProfileController)
 
     @PostConstruct
     private void PreRegisterUsers(){

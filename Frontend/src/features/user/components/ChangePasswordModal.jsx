@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { updateCredentials } from '../../auth/services/authApi';
+import { changePassword } from '../../auth/services/authApi';
 import { X, Lock, Eye, EyeOff } from 'lucide-react';
 
 /**
@@ -68,10 +68,10 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess }) => {
 
     try {
       setLoading(true);
-      const response = await updateCredentials({
-        currentPassword: formData.currentPassword,
-        newPassword: formData.newPassword,
-      });
+      const response = await changePassword(
+        formData.currentPassword,
+        formData.newPassword
+      );
 
       if (response.success || response.message) {
         toast.success('Đổi mật khẩu thành công!');
@@ -84,7 +84,9 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      const errorMessage = error.response?.data?.message || 'Đổi mật khẩu thất bại';
+      const errorMessage = error.response?.data?.message ||
+                          error.response?.data?.error ||
+                          'Đổi mật khẩu thất bại';
       toast.error(errorMessage);
     } finally {
       setLoading(false);

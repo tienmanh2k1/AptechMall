@@ -174,19 +174,39 @@ export const updateProfile = async (profileData) => {
 };
 
 /**
- * Update user credentials (email or password)
- * @param {Object} credentials
- * @param {string} [credentials.email] - New email
- * @param {string} [credentials.currentPassword] - Current password (required)
- * @param {string} [credentials.newPassword] - New password
+ * Change user password
+ * @param {string} currentPassword - Current password
+ * @param {string} newPassword - New password
  * @returns {Promise<Object>} Success response
  */
-export const updateCredentials = async (credentials) => {
+export const changePassword = async (currentPassword, newPassword) => {
   try {
-    const response = await api.post('/auth/update-credentials', credentials);
+    const response = await api.post('/users/me/change-password', {
+      currentPassword,
+      newPassword
+    });
     return response.data;
   } catch (error) {
-    console.error('Update credentials error:', error);
+    console.error('Change password error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Change user email
+ * @param {string} currentPassword - Current password (for verification)
+ * @param {string} newEmail - New email address
+ * @returns {Promise<Object>} Success response
+ */
+export const changeEmail = async (currentPassword, newEmail) => {
+  try {
+    const response = await api.post('/users/me/change-email', {
+      currentPassword,
+      newEmail
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Change email error:', error);
     throw error;
   }
 };

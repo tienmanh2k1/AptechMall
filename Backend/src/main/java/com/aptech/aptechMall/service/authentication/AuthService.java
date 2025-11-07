@@ -299,33 +299,7 @@ public class AuthService {
         }
     }
 
-    public void updateEmailOrPassword(HttpServletRequest request, HttpServletResponse response, UpdateCredential credential){
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("Missing or invalid Authorization header");
-        }
-        try {
-            User user = userRepository.findByEmail(credential.getOldEmail()).orElseThrow(() -> new UsernameNotFoundException("Email not in Database"));
-            boolean existUsername = userRepository.existsByUsername(user.getUsername());
-            if (!passwordEncoder.matches(credential.getOldPassword(), user.getPassword())){
-                throw new BadCredentialsException("Old Password does not match");
-            }
-            user.setPassword(passwordEncoder.encode(credential.getPassword()));
-
-            if(!credential.getEmail().equals(credential.getOldEmail())){
-                user.setEmail(credential.getEmail());
-                var tokenCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh_token")).findFirst().orElseThrow();
-                var currentRefreshToken = tokenCookie.getValue();
-                String refreshJwt = jwtService.generateToken(existUsername ? user.getUsername() : user.getEmail(), "refresh_token");
-
-                Cookie refreshTokenCookie = getRefreshTokenCookie(refreshJwt);
-                setCookieAttribute(response, refreshTokenCookie);
-                revokeToken(currentRefreshToken);
-            }
-            userRepository.save(user);
-
-        } catch (Exception e) {
-            System.err.println("Error extracting subject from JWT: " + e.getMessage());
-        }
-    }
+    // Old updateEmailOrPassword method removed - replaced by:
+    // - UserProfileService.changePassword()
+    // - UserProfileService.changeEmail()
 }

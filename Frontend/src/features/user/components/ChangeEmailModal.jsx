@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { updateCredentials } from '../../auth/services/authApi';
+import { changeEmail } from '../../auth/services/authApi';
 import { X, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 /**
@@ -64,10 +64,10 @@ const ChangeEmailModal = ({ isOpen, onClose, currentEmail, onSuccess }) => {
 
     try {
       setLoading(true);
-      const response = await updateCredentials({
-        email: formData.newEmail,
-        currentPassword: formData.currentPassword,
-      });
+      const response = await changeEmail(
+        formData.currentPassword,
+        formData.newEmail
+      );
 
       if (response.success || response.message) {
         toast.success('Đổi email thành công!');
@@ -80,7 +80,9 @@ const ChangeEmailModal = ({ isOpen, onClose, currentEmail, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error changing email:', error);
-      const errorMessage = error.response?.data?.message || 'Đổi email thất bại';
+      const errorMessage = error.response?.data?.message ||
+                          error.response?.data?.error ||
+                          'Đổi email thất bại';
       toast.error(errorMessage);
     } finally {
       setLoading(false);
