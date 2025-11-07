@@ -13,9 +13,33 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * REST Controller for bank transfer SMS webhook
- * Public endpoints for receiving bank SMS notifications
- * Base path: /api/bank-transfer
+ * Controller xử lý nạp tiền qua SMS Banking (Bank Transfer SMS Integration)
+ *
+ * Endpoint base: /api/bank-transfer
+ * ĐẶC BIỆT: Tất cả endpoints đều PUBLIC (không cần JWT token)
+ *
+ * ⚠️ CHỈ SỬ DỤNG CHO DEVELOPMENT/TESTING - KHÔNG DÙNG PRODUCTION
+ * Production nên dùng cổng thanh toán chính thức (VNPay, MoMo, ZaloPay)
+ *
+ * CÁCH HOẠT ĐỘNG:
+ * 1. User chuyển khoản vào tài khoản ngân hàng của hệ thống
+ * 2. Ngân hàng gửi SMS thông báo đến SĐT đã đăng ký
+ * 3. Dùng app "SMS Forwarder" để forward SMS đến webhook của server
+ * 4. Server parse SMS → trích xuất: số tiền, mã GD, user email/ID
+ * 5. Tự động nạp tiền vào ví user
+ *
+ * NỘI DUNG CHUYỂN KHOẢN PHảI CÓ:
+ * - "Nap tien USER{userId}" hoặc "USER{userId}"
+ * - Ví dụ: "Nap tien USER123" → nạp tiền cho user có ID = 123
+ *
+ * HỖ TRỢ NGÂN HÀNG:
+ * - Vietcombank, VietinBank, BIDV, Techcombank, MB Bank, ACB, v.v.
+ * - Tự động nhận diện format SMS của từng ngân hàng
+ *
+ * ENDPOINTS ADMIN:
+ * - GET /api/bank-transfer/sms - Xem tất cả SMS đã nhận
+ * - GET /api/bank-transfer/sms/errors - Xem SMS lỗi
+ * - POST /api/bank-transfer/process-pending - Xử lý lại SMS pending
  */
 @RestController
 @RequestMapping("/api/bank-transfer")
@@ -26,15 +50,34 @@ public class BankTransferController {
     private final BankTransferService bankTransferService;
 
     /**
-     * Webhook endpoint to receive bank SMS
-     * POST /api/bank-transfer/sms-webhook (supports both query params and form data)
-     * GET /api/bank-transfer/sms-webhook (for testing)
+     * Webhook nhận SMS từ ngân hàng (được gọi bởi SMS Forwarder app)
      *
-     * @param sender SMS sender (bank identifier)
-     * @param message SMS content
-     * @param raw Raw SMS data (optional)
-     * @param request HttpServletRequest to read body if params are null
-     * @return Success response
+     * POST/GET /api/bank-transfer/sms-webhook
+     * PUBLIC endpoint - không cần authentication
+     *
+     * Hỗ trợ nhiều format:
+     * - Query parameters: ?sender=BANK&message=SMS_CONTENT
+     * - Form data: sender=BANK&message=SMS_CONTENT
+     * - JSON body: {"sender": "BANK", "message": "SMS_CONTENT"}
+     *
+     * Quy trình xử lý:
+     * 1. Nhận SMS từ webhook
+     * 2. Parse SMS để trích xuất: amount, transaction reference, user ID/email
+     * 3. Kiểm tra duplicate (dựa vào mã GD)
+     * 4. Tìm user (qua USER{id} trong nội dung hoặc email)
+     * 5. Nạp tiền vào ví user
+     * 6. Lưu log vào database (BankSms entity)
+     *
+     * Format SMS hỗ trợ:
+     * - "TK 1234567890 +500,000 VND. GD: 987654. ND: Nap tien USER123"
+     * - "+500000d GD:987654 ND:USER123"
+     * - "GD 100k" (để testing nhanh)
+     *
+     * @param sender Tên ngân hàng gửi SMS (VIETCOMBANK, VIETTINBANK, v.v.)
+     * @param message Nội dung SMS
+     * @param raw Dữ liệu SMS gốc (optional)
+     * @param request HttpServletRequest để đọc body nếu params null
+     * @return ApiResponse với thông tin SMS đã xử lý
      */
     @RequestMapping(value = "/sms-webhook", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<ApiResponse<Map<String, Object>>> receiveSms(

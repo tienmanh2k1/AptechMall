@@ -14,29 +14,48 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * REST Controller for shopping cart operations
- * Base path: /api/cart
+ * Controller quản lý giỏ hàng (Shopping Cart)
  *
- * SECURITY: All endpoints use authenticated user's ID from JWT token.
- * Users can only access their own cart.
+ * Endpoint base: /api/cart
+ * YÊU CẦU AUTHENTICATION: Tất cả endpoints cần JWT token
+ *
+ * BẢO MẬT QUAN TRỌNG:
+ * - userId được lấy TỰ ĐỘNG từ JWT token (AuthenticationUtil.getCurrentUserId())
+ * - KHÔNG BAO GIỜ chấp nhận userId từ client
+ * - Mỗi user chỉ có thể truy cập giỏ hàng của chính mình
+ *
+ * Chức năng:
+ * - Xem giỏ hàng (GET /api/cart)
+ * - Thêm sản phẩm vào giỏ (POST /api/cart/items)
+ * - Cập nhật số lượng (PUT /api/cart/items/{itemId})
+ * - Xóa sản phẩm khỏi giỏ (DELETE /api/cart/items/{itemId})
+ * - Xóa toàn bộ giỏ hàng (DELETE /api/cart/clear)
  */
 @RestController
 @RequestMapping("/api/cart")
 @RequiredArgsConstructor
-@Slf4j
+@Slf4j // Lombok tự động tạo logger
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:4200"})
 public class CartController {
 
     private final CartService cartService;
 
     /**
-     * Get user's cart with all items
+     * Lấy thông tin giỏ hàng của user hiện tại
+     *
      * GET /api/cart
      *
-     * @return CartResponse with items and total
+     * Response bao gồm:
+     * - Danh sách sản phẩm trong giỏ (items)
+     * - Tổng số lượng sản phẩm (totalQuantity)
+     * - Tổng giá trị (totalPrice)
+     * - Thông tin cart (cartId, createdAt, updatedAt)
+     *
+     * @return CartResponse chứa toàn bộ thông tin giỏ hàng
      */
     @GetMapping
     public ResponseEntity<ApiResponse<CartResponse>> getCart() {
+        // Lấy userId từ JWT token (BẢO MẬT)
         Long userId = AuthenticationUtil.getCurrentUserId();
         log.info("GET /api/cart - userId: {}", userId);
 
@@ -48,11 +67,22 @@ public class CartController {
     }
 
     /**
-     * Add product to cart
+     * Thêm sản phẩm vào giỏ hàng
+     *
      * POST /api/cart/items
      *
-     * @param request AddToCartRequest (product details)
-     * @return Updated CartResponse
+     * Request body cần có:
+     * - productId: ID sản phẩm từ marketplace (AliExpress/1688)
+     * - quantity: Số lượng muốn thêm
+     * - price: Giá sản phẩm tại thời điểm thêm
+     * - productName, imageUrl, marketplace: Thông tin hiển thị
+     *
+     * Xử lý:
+     * - Nếu sản phẩm đã có trong giỏ → Cộng thêm số lượng
+     * - Nếu sản phẩm chưa có → Tạo CartItem mới
+     *
+     * @param request Thông tin sản phẩm cần thêm
+     * @return CartResponse với giỏ hàng đã cập nhật
      */
     @PostMapping("/items")
     public ResponseEntity<ApiResponse<CartResponse>> addToCart(
@@ -68,12 +98,22 @@ public class CartController {
     }
 
     /**
-     * Update cart item quantity
+     * Cập nhật số lượng của một sản phẩm trong giỏ hàng
+     *
      * PUT /api/cart/items/{itemId}
      *
-     * @param itemId Cart item ID
-     * @param request UpdateCartItemRequest (new quantity)
-     * @return Updated CartResponse
+     * Cho phép:
+     * - Tăng số lượng (quantity > hiện tại)
+     * - Giảm số lượng (quantity > 0)
+     * - Nếu quantity = 0 → Xóa item khỏi giỏ
+     *
+     * Bảo mật:
+     * - Kiểm tra itemId có thuộc về user hiện tại không
+     * - Nếu không → throw exception
+     *
+     * @param itemId ID của CartItem cần cập nhật
+     * @param request Chứa số lượng mới
+     * @return CartResponse với giỏ hàng đã cập nhật
      */
     @PutMapping("/items/{itemId}")
     public ResponseEntity<ApiResponse<CartResponse>> updateCartItem(
@@ -91,11 +131,16 @@ public class CartController {
     }
 
     /**
-     * Remove item from cart
+     * Xóa một sản phẩm khỏi giỏ hàng
+     *
      * DELETE /api/cart/items/{itemId}
      *
-     * @param itemId Cart item ID
-     * @return Updated CartResponse
+     * Bảo mật:
+     * - Kiểm tra itemId có thuộc về user hiện tại không
+     * - Chỉ cho phép xóa item của chính mình
+     *
+     * @param itemId ID của CartItem cần xóa
+     * @return CartResponse với giỏ hàng sau khi xóa
      */
     @DeleteMapping("/items/{itemId}")
     public ResponseEntity<ApiResponse<CartResponse>> removeCartItem(
@@ -111,10 +156,15 @@ public class CartController {
     }
 
     /**
-     * Clear all items from cart
+     * Xóa toàn bộ sản phẩm trong giỏ hàng
+     *
      * DELETE /api/cart/clear
      *
-     * @return Empty CartResponse
+     * Thường được sử dụng:
+     * - Sau khi checkout thành công
+     * - Khi user muốn làm mới giỏ hàng
+     *
+     * @return CartResponse rỗng (không còn item nào)
      */
     @DeleteMapping("/clear")
     public ResponseEntity<ApiResponse<CartResponse>> clearCart() {

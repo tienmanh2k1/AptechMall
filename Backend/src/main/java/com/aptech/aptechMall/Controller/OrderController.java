@@ -22,11 +22,34 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * REST Controller for order operations
- * Base path: /api/orders
+ * Controller quản lý đơn hàng (Orders)
  *
- * SECURITY: All endpoints use authenticated user's ID from JWT token.
- * Users can only access their own orders.
+ * Endpoint base: /api/orders
+ * YÊU CẦU AUTHENTICATION: Tất cả endpoints cần JWT token
+ *
+ * BẢO MẬT QUAN TRỌNG:
+ * - userId lấy TỰ ĐỘNG từ JWT token
+ * - KHÔNG chấp nhận userId từ client
+ * - Mỗi user chỉ có thể truy cập đơn hàng của chính mình
+ *
+ * Chức năng:
+ * - Checkout: Tạo đơn hàng từ giỏ hàng (POST /checkout)
+ * - Xem danh sách đơn hàng (GET /)
+ * - Xem chi tiết đơn hàng (GET /{orderId})
+ * - Hủy đơn hàng (POST /{orderId}/cancel)
+ * - Cập nhật địa chỉ giao hàng (PUT /{orderId}/address) - chỉ khi đơn PENDING
+ *
+ * Trạng thái đơn hàng:
+ * - PENDING: Chờ xử lý
+ * - PROCESSING: Đang xử lý
+ * - SHIPPED: Đã gửi hàng
+ * - DELIVERED: Đã giao hàng
+ * - CANCELLED: Đã hủy
+ *
+ * Thanh toán:
+ * - Sử dụng ví điện tử (wallet balance)
+ * - Tự động trừ tiền khi checkout thành công
+ * - Hoàn tiền khi hủy đơn (nếu đã thanh toán)
  */
 @RestController
 @RequestMapping("/api/orders")
@@ -38,11 +61,27 @@ public class OrderController {
     private final OrderService orderService;
 
     /**
-     * Checkout - Create order from cart
+     * Tạo đơn hàng từ giỏ hàng (Checkout)
+     *
      * POST /api/orders/checkout
      *
-     * @param request CheckoutRequest (shipping address, phone, note)
-     * @return Created OrderResponse
+     * Quy trình:
+     * 1. Lấy tất cả items từ giỏ hàng của user
+     * 2. Kiểm tra giỏ hàng không rỗng
+     * 3. Tính tổng tiền (bao gồm phí xử lý nếu có)
+     * 4. Kiểm tra số dư ví đủ để thanh toán
+     * 5. Trừ tiền từ ví user
+     * 6. Tạo đơn hàng với trạng thái PENDING
+     * 7. Xóa giỏ hàng sau khi tạo đơn thành công
+     * 8. Ghi log giao dịch wallet
+     *
+     * Request body cần có:
+     * - shippingAddress: Địa chỉ giao hàng
+     * - recipientPhone: SĐT người nhận
+     * - note: Ghi chú đơn hàng (optional)
+     *
+     * @param request Thông tin checkout
+     * @return OrderResponse với đơn hàng vừa tạo
      */
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<OrderResponse>> checkout(
@@ -58,12 +97,25 @@ public class OrderController {
     }
 
     /**
-     * Get all orders for user with pagination
+     * Lấy danh sách tất cả đơn hàng của user (có phân trang)
+     *
      * GET /api/orders?page={page}&size={size}
      *
-     * @param page Page number (default: 0)
-     * @param size Page size (default: 10)
-     * @return Page of OrderResponse (summary without items)
+     * Response bao gồm:
+     * - orders: Danh sách đơn hàng (OrderResponse - summary, không có items chi tiết)
+     * - currentPage: Trang hiện tại
+     * - totalItems: Tổng số đơn hàng
+     * - totalPages: Tổng số trang
+     * - pageSize: Số đơn hàng mỗi trang
+     * - hasNext, hasPrevious: Có trang tiếp theo/trước không
+     *
+     * Mặc định:
+     * - page = 0 (trang đầu tiên)
+     * - size = 10 (10 đơn hàng mỗi trang)
+     *
+     * @param page Số trang (bắt đầu từ 0)
+     * @param size Số lượng đơn hàng mỗi trang
+     * @return Map chứa danh sách đơn hàng và metadata phân trang
      */
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getUserOrders(
@@ -75,7 +127,7 @@ public class OrderController {
         Pageable pageable = PageRequest.of(page, size);
         Page<OrderResponse> ordersPage = orderService.getUserOrders(userId, pageable);
 
-        // Build response with pagination metadata
+        // Tạo response với metadata phân trang
         Map<String, Object> response = new HashMap<>();
         response.put("orders", ordersPage.getContent());
         response.put("currentPage", ordersPage.getNumber());
@@ -91,11 +143,21 @@ public class OrderController {
     }
 
     /**
-     * Get order detail by ID
+     * Lấy thông tin chi tiết của một đơn hàng
+     *
      * GET /api/orders/{orderId}
      *
-     * @param orderId Order ID
-     * @return OrderResponse with items
+     * Response bao gồm:
+     * - Thông tin đơn hàng đầy đủ
+     * - Danh sách items (sản phẩm) trong đơn
+     * - Trạng thái đơn hàng
+     * - Thông tin thanh toán
+     * - Địa chỉ giao hàng
+     *
+     * Bảo mật: Chỉ cho phép xem đơn hàng của chính mình
+     *
+     * @param orderId ID của đơn hàng cần xem
+     * @return OrderResponse với thông tin đầy đủ bao gồm items
      */
     @GetMapping("/{orderId}")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrderDetail(

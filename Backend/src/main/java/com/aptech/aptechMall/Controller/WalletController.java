@@ -18,9 +18,28 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * REST Controller for wallet operations
- * All endpoints require authentication
- * Base path: /api/wallet
+ * Controller quản lý ví điện tử (E-Wallet)
+ *
+ * Endpoint base: /api/wallet
+ * YÊU CẦU AUTHENTICATION: Tất cả endpoints cần JWT token
+ *
+ * Hệ thống ví điện tử cho phép:
+ * - Xem số dư ví
+ * - Nạp tiền vào ví (qua VNPay, MoMo, ZaloPay, Bank Transfer)
+ * - Xem lịch sử giao dịch
+ * - Admin: Khóa/mở khóa ví, xem tất cả ví
+ *
+ * Bảo mật:
+ * - userId lấy từ JWT token (KHÔNG chấp nhận từ client)
+ * - Admin operations cần role ADMIN
+ * - Ví có thể bị khóa (locked) để ngăn giao dịch bất thường
+ *
+ * Loại giao dịch:
+ * - DEPOSIT: Nạp tiền vào ví
+ * - WITHDRAWAL: Rút tiền từ ví
+ * - ORDER_PAYMENT: Thanh toán đơn hàng
+ * - ORDER_REFUND: Hoàn tiền khi hủy đơn
+ * - ADMIN_ADJUSTMENT: Admin điều chỉnh số dư thủ công
  */
 @RestController
 @RequestMapping("/api/wallet")
@@ -31,9 +50,18 @@ public class WalletController {
     private final WalletService walletService;
 
     /**
-     * Get current user's wallet information
+     * Lấy thông tin ví của user hiện tại
+     *
      * GET /api/wallet
-     * @return WalletResponse
+     *
+     * Response bao gồm:
+     * - walletId: ID của ví
+     * - userId: ID người dùng
+     * - balance: Số dư hiện tại (VND)
+     * - isLocked: Trạng thái khóa ví
+     * - createdAt, updatedAt: Thời gian tạo/cập nhật
+     *
+     * @return WalletResponse chứa thông tin ví
      */
     @GetMapping
     public ResponseEntity<ApiResponse<WalletResponse>> getWallet() {
@@ -56,10 +84,24 @@ public class WalletController {
     }
 
     /**
-     * Initiate deposit transaction
+     * Khởi tạo giao dịch nạp tiền vào ví
+     *
      * POST /api/wallet/deposit/initiate
-     * @param request Deposit request
-     * @return DepositInitiateResponse with payment URL
+     *
+     * Quy trình nạp tiền:
+     * 1. User gọi endpoint này với số tiền và cổng thanh toán
+     * 2. Hệ thống tạo transaction PENDING
+     * 3. Trả về paymentUrl để redirect user đến cổng thanh toán
+     * 4. User thanh toán tại cổng (VNPay/MoMo/ZaloPay/BankTransfer)
+     * 5. Cổng thanh toán gọi callback endpoint để xác nhận
+     * 6. Hệ thống cập nhật số dư ví
+     *
+     * Request body:
+     * - amount: Số tiền nạp (VND), tối thiểu 10,000 VND
+     * - paymentGateway: VNPAY / MOMO / ZALOPAY / BANK_TRANSFER
+     *
+     * @param request Thông tin nạp tiền
+     * @return DepositInitiateResponse với paymentUrl để redirect
      */
     @PostMapping("/deposit/initiate")
     public ResponseEntity<ApiResponse<DepositInitiateResponse>> initiateDeposit(
@@ -84,13 +126,24 @@ public class WalletController {
     }
 
     /**
-     * Process deposit callback from payment gateway
+     * Xử lý callback từ cổng thanh toán sau khi nạp tiền thành công
+     *
      * POST /api/wallet/deposit/callback
-     * This endpoint is called by payment gateway after successful payment
-     * @param amount Deposit amount
-     * @param paymentGateway Payment gateway used
-     * @param referenceNumber Payment reference from gateway
-     * @return WalletTransactionResponse
+     *
+     * Endpoint này được GỌI BỞI CỔNG THANH TOÁN (VNPay/MoMo/ZaloPay) sau khi user thanh toán thành công.
+     * Không nên gọi trực tiếp từ frontend.
+     *
+     * Xử lý:
+     * - Kiểm tra transaction tồn tại và ở trạng thái PENDING
+     * - Xác thực referenceNumber từ cổng thanh toán
+     * - Cập nhật trạng thái transaction thành COMPLETED
+     * - Cộng tiền vào ví user
+     * - Ghi log vào PaymentGatewayLog
+     *
+     * @param amount Số tiền đã thanh toán
+     * @param paymentGateway Cổng thanh toán đã sử dụng
+     * @param referenceNumber Mã tham chiếu từ cổng thanh toán
+     * @return WalletTransactionResponse với thông tin giao dịch đã hoàn thành
      */
     @PostMapping("/deposit/callback")
     public ResponseEntity<ApiResponse<WalletTransactionResponse>> processDepositCallback(
@@ -119,10 +172,24 @@ public class WalletController {
     }
 
     /**
-     * Get transaction history with filters
+     * Lấy lịch sử giao dịch ví với các bộ lọc
+     *
      * GET /api/wallet/transactions
-     * @param filter Transaction filter (query parameters)
-     * @return Page of WalletTransactionResponse
+     *
+     * Hỗ trợ lọc theo:
+     * - transactionType: DEPOSIT / WITHDRAWAL / ORDER_PAYMENT / ORDER_REFUND / ADMIN_ADJUSTMENT
+     * - startDate, endDate: Khoảng thời gian
+     * - page, size: Phân trang (mặc định: page=0, size=20)
+     * - sort: Sắp xếp (createdAt,desc mặc định)
+     *
+     * Response là Page object bao gồm:
+     * - content: Danh sách giao dịch
+     * - totalElements: Tổng số giao dịch
+     * - totalPages: Tổng số trang
+     * - pageable: Thông tin phân trang
+     *
+     * @param filter Bộ lọc giao dịch (query parameters)
+     * @return Page<WalletTransactionResponse> danh sách giao dịch đã lọc
      */
     @GetMapping("/transactions")
     public ResponseEntity<ApiResponse<Page<WalletTransactionResponse>>> getTransactionHistory(
@@ -146,10 +213,14 @@ public class WalletController {
     }
 
     /**
-     * Get single transaction by ID
+     * Lấy thông tin chi tiết của một giao dịch cụ thể
+     *
      * GET /api/wallet/transactions/{id}
-     * @param transactionId Transaction ID
-     * @return WalletTransactionResponse
+     *
+     * Bảo mật: Chỉ cho phép xem giao dịch của chính mình
+     *
+     * @param transactionId ID của giao dịch cần xem
+     * @return WalletTransactionResponse với thông tin chi tiết giao dịch
      */
     @GetMapping("/transactions/{id}")
     public ResponseEntity<ApiResponse<WalletTransactionResponse>> getTransaction(
@@ -177,17 +248,29 @@ public class WalletController {
     }
 
     /**
-     * Lock user wallet (admin operation)
+     * Khóa ví của một user (chỉ ADMIN)
+     *
      * POST /api/wallet/{userId}/lock
-     * @param targetUserId User ID to lock wallet
-     * @return Success message
+     * YÊU CẦU: Role ADMIN
+     *
+     * Khi ví bị khóa:
+     * - User KHÔNG THỂ nạp tiền
+     * - User KHÔNG THỂ sử dụng ví để thanh toán
+     * - Chỉ có thể xem số dư
+     *
+     * Mục đích:
+     * - Ngăn chặn giao dịch bất thường
+     * - Tạm khóa tài khoản nghi ngờ gian lận
+     * - Bảo vệ hệ thống khỏi lạm dụng
+     *
+     * @param targetUserId ID của user cần khóa ví
+     * @return Thông báo thành công
      */
     @PostMapping("/{userId}/lock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')") // Spring Security kiểm tra role
     public ResponseEntity<ApiResponse<String>> lockWallet(@PathVariable("userId") Long targetUserId) {
         try {
-            // TODO: Add admin authorization check
-            log.info("POST /api/wallet/{}/lock", targetUserId);
+            log.info("POST /api/wallet/{}/lock - Admin action", targetUserId);
 
             walletService.lockWallet(targetUserId);
             return ResponseEntity.ok(ApiResponse.success(null, "Wallet locked successfully"));
@@ -200,17 +283,21 @@ public class WalletController {
     }
 
     /**
-     * Unlock user wallet (admin operation)
+     * Mở khóa ví của một user (chỉ ADMIN)
+     *
      * POST /api/wallet/{userId}/unlock
-     * @param targetUserId User ID to unlock wallet
-     * @return Success message
+     * YÊU CẦU: Role ADMIN
+     *
+     * Sau khi mở khóa, user có thể sử dụng ví bình thường trở lại
+     *
+     * @param targetUserId ID của user cần mở khóa ví
+     * @return Thông báo thành công
      */
     @PostMapping("/{userId}/unlock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> unlockWallet(@PathVariable("userId") Long targetUserId) {
         try {
-            // TODO: Add admin authorization check
-            log.info("POST /api/wallet/{}/unlock", targetUserId);
+            log.info("POST /api/wallet/{}/unlock - Admin action", targetUserId);
 
             walletService.unlockWallet(targetUserId);
             return ResponseEntity.ok(ApiResponse.success(null, "Wallet unlocked successfully"));
@@ -223,15 +310,20 @@ public class WalletController {
     }
 
     /**
-     * Get all wallets (admin operation)
+     * Lấy danh sách tất cả ví trong hệ thống (chỉ ADMIN)
+     *
      * GET /api/wallet/admin/all
-     * @return List of all wallets
+     * YÊU CẦU: Role ADMIN
+     *
+     * Trả về tất cả ví của mọi user để admin theo dõi
+     *
+     * @return List<WalletResponse> danh sách tất cả ví
      */
     @GetMapping("/admin/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<WalletResponse>>> getAllWallets() {
         try {
-            log.info("GET /api/wallet/admin/all");
+            log.info("GET /api/wallet/admin/all - Admin action");
 
             List<WalletResponse> wallets = walletService.getAllWallets();
             return ResponseEntity.ok(ApiResponse.success(wallets, "Wallets retrieved successfully"));
