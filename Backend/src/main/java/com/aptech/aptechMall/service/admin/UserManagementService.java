@@ -106,7 +106,8 @@ public class UserManagementService {
         }
 
         user.setStatus(Status.DELETED);
-        userRepository.deleteById(id);
+        userRepository.save(user);
+        //userRepository.deleteById(id);
     }
 
     public RegisterResponse create(RegisterRequest request) {
